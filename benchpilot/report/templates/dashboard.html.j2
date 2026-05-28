@@ -88,11 +88,11 @@ const DATA = JSON.parse(document.getElementById('bench-data').textContent);
 // Map metric -> chart config (title, unit, y-axis label)
 const METRIC_CHARTS = {
   temp:           {title: "Temperature",        unit: "°C"},
-  util:           {title: "CPU utilisation",    unit: "%"},
-  util_gpu:       {title: "GPU utilisation",    unit: "%"},
-  util_mem:       {title: "GPU mem utilisation",unit: "%"},
+  util:           {title: "CPU utilization",    unit: "%"},
+  util_gpu:       {title: "GPU utilization",    unit: "%"},
+  util_mem:       {title: "GPU mem utilization",unit: "%"},
   mem_used:       {title: "GPU memory used",    unit: "MiB"},
-  power:          {title: "Power",              unit: "W"},
+  power:          {title: "GPU Power",          unit: "W"},
   clock:          {title: "CPU clock",          unit: "MHz"},
   clock_graphics: {title: "GPU graphics clock", unit: "MHz"},
   clock_memory:   {title: "GPU memory clock",   unit: "MHz"},
@@ -105,7 +105,7 @@ const METRIC_CHARTS = {
   spare:          {title: "SSD spare",          unit: "%"},
 };
 
-const DEFAULT_METRICS = new Set(["temp", "util", "util_gpu", "power", "clock", "clock_graphics", "rpm"]);
+const DEFAULT_METRICS = new Set(["temp", "util", "rpm", "util_gpu", "power", "fan"]);
 const COMPONENTS = ["cpu", "ram", "ssd", "gpu"];
 const COMPONENT_FOR_SOURCE = (src) => {
   if (src === "nvidia") return "gpu";
