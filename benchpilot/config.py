@@ -52,7 +52,6 @@ class StressConfig:
     report_dir: Path = DEFAULT_REPORT_DIR
     sample_interval: float = 1.0
     ssd_target_dir: Path = DEFAULT_FIO_DIR
-    hf_cache_dir: Path = DEFAULT_HF_CACHE_DIR
 
     @property
     def db_path(self) -> Path:

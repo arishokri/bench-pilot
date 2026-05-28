@@ -108,7 +108,6 @@ def cmd_stress(
     label: Optional[str] = typer.Option(None, "--label", "-l"),
     data_dir: Path = typer.Option(Path("./data"), "--data-dir"),
     ssd_dir: Optional[Path] = typer.Option(None, "--ssd-dir"),
-    hf_cache_dir: Optional[Path] = typer.Option(None, "--hf-cache-dir"),
     sample_interval: float = typer.Option(1.0, "--sample-interval"),
 ) -> None:
     """Time-based stress test for thermal characterization."""
@@ -121,8 +120,6 @@ def cmd_stress(
     )
     if ssd_dir is not None:
         cfg.ssd_target_dir = ssd_dir
-    if hf_cache_dir is not None:
-        cfg.hf_cache_dir = hf_cache_dir
     run_stress(cfg, console=console)
 
 

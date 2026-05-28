@@ -71,20 +71,22 @@ class RunSummary:
     benchmarks_skipped: int
 
 
-def _prepare_scratch_dirs(*, fio_dir: Path, hf_dir: Path) -> None:
+def _prepare_scratch_dirs(*, fio_dir: Path, hf_dir: Path | None = None) -> None:
     """Create local scratch dirs and steer HuggingFace + fio at them.
 
     Done before any benchmark .run() so transformers/diffusers pick up HF_HOME
-    on their first import inside a benchmark.
+    on their first import inside a benchmark. Pass hf_dir=None when the run will
+    never touch HuggingFace models (e.g. stress mode).
     """
     fio_dir.mkdir(parents=True, exist_ok=True)
-    hf_dir.mkdir(parents=True, exist_ok=True)
-    hf_abs = str(hf_dir.resolve())
-    os.environ["HF_HOME"] = hf_abs
-    # Belt-and-braces: some libs still consult the legacy names.
-    os.environ.setdefault("HF_HUB_CACHE", str((hf_dir / "hub").resolve()))
-    os.environ.setdefault("TRANSFORMERS_CACHE", hf_abs)
-    os.environ.setdefault("DIFFUSERS_CACHE", hf_abs)
+    if hf_dir is not None:
+        hf_dir.mkdir(parents=True, exist_ok=True)
+        hf_abs = str(hf_dir.resolve())
+        os.environ["HF_HOME"] = hf_abs
+        # Belt-and-braces: some libs still consult the legacy names.
+        os.environ.setdefault("HF_HUB_CACHE", str((hf_dir / "hub").resolve()))
+        os.environ.setdefault("TRANSFORMERS_CACHE", hf_abs)
+        os.environ.setdefault("DIFFUSERS_CACHE", hf_abs)
     # Reduce CUDA allocator fragmentation across back-to-back GPU benchmarks.
     os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
@@ -172,7 +174,7 @@ def run_benchmarks(cfg: RunConfig, console: Console | None = None) -> RunSummary
 
 def run_stress(cfg: StressConfig, console: Console | None = None) -> RunSummary:
     console = console or Console()
-    _prepare_scratch_dirs(fio_dir=cfg.ssd_target_dir, hf_dir=cfg.hf_cache_dir)
+    _prepare_scratch_dirs(fio_dir=cfg.ssd_target_dir)
     storage = Storage(cfg.db_path)
     sysinfo = _system_info()
     label = cfg.label or f"stress-{cfg.duration_seconds}s"
