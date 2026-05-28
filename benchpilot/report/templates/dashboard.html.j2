@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>benchpilot — {{ generated_at }}</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+<style>
+  :root {
+    --bg: #0e1116; --panel: #161b22; --border: #232a33;
+    --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff;
+    --green: #3fb950; --yellow: #d29922; --red: #f85149;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+         background: var(--bg); color: var(--text); }
+  header { padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: baseline; gap: 16px; }
+  header h1 { margin: 0; font-size: 18px; }
+  header .meta { color: var(--muted); font-size: 12px; }
+  .layout { display: grid; grid-template-columns: 320px 1fr; min-height: calc(100vh - 50px); }
+  aside { background: var(--panel); border-right: 1px solid var(--border); padding: 16px; overflow-y: auto; }
+  main { padding: 16px 24px; overflow-y: auto; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 16px 0 8px; }
+  h2:first-child { margin-top: 0; }
+  .run-item { padding: 8px; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 6px;
+              cursor: pointer; transition: background .1s; }
+  .run-item:hover { background: #1c232c; }
+  .run-item.active { border-color: var(--accent); background: #1a2330; }
+  .run-item label { display: flex; gap: 8px; align-items: flex-start; cursor: pointer; }
+  .run-item .run-id { color: var(--accent); font-weight: 600; }
+  .run-item .run-meta { color: var(--muted); font-size: 12px; }
+  .checkbox-list label { display: flex; gap: 6px; align-items: center; padding: 3px 0;
+                         font-size: 13px; cursor: pointer; }
+  .checkbox-list input { accent-color: var(--accent); }
+  .chart { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+           padding: 8px; margin-bottom: 16px; }
+  .chart-title { font-weight: 600; padding: 4px 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--panel);
+          border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  th, td { padding: 6px 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+  th { background: #1c232c; color: var(--muted); font-weight: 600; font-size: 12px;
+       text-transform: uppercase; letter-spacing: .04em; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+  .badge.ok { background: #1f3d27; color: var(--green); }
+  .badge.error { background: #3d2120; color: var(--red); }
+  .badge.skipped { background: #3d3320; color: var(--yellow); }
+  .empty { color: var(--muted); padding: 40px; text-align: center; }
+  .stack { display: flex; flex-direction: column; gap: 8px; }
+  .filter-section { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 12px; }
+  pre.json { background: #0a0d11; border: 1px solid var(--border); border-radius: 4px;
+             padding: 6px 8px; font-size: 11px; color: var(--muted); white-space: pre-wrap;
+             max-height: 200px; overflow: auto; margin: 4px 0; }
+  button { background: var(--accent); color: #0d1117; border: 0; padding: 4px 10px;
+           border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600; }
+  button.secondary { background: var(--panel); color: var(--text); border: 1px solid var(--border); }
+</style>
+</head>
+<body>
+<header>
+  <h1>benchpilot</h1>
+  <span class="meta">{{ run_count }} run(s) · generated {{ generated_at }}</span>
+</header>
+<div class="layout">
+  <aside>
+    <h2>Runs</h2>
+    <div id="runs-list"></div>
+    <div class="filter-section">
+      <h2>Components</h2>
+      <div id="component-filter" class="checkbox-list"></div>
+    </div>
+    <div class="filter-section">
+      <h2>Metrics</h2>
+      <div id="metric-filter" class="checkbox-list"></div>
+    </div>
+    <div class="filter-section">
+      <h2>Sources</h2>
+      <div id="source-filter" class="checkbox-list"></div>
+    </div>
+  </aside>
+  <main>
+    <div id="main-content"><div class="empty">Select a run on the left.</div></div>
+  </main>
+</div>
+
+<script id="bench-data" type="application/json">{{ data_json | safe }}</script>
+<script>
+const DATA = JSON.parse(document.getElementById('bench-data').textContent);
+
+// Map metric -> chart config (title, unit, y-axis label)
+const METRIC_CHARTS = {
+  temp:           {title: "Temperature",        unit: "°C"},
+  util:           {title: "CPU utilisation",    unit: "%"},
+  util_gpu:       {title: "GPU utilisation",    unit: "%"},
+  util_mem:       {title: "GPU mem utilisation",unit: "%"},
+  mem_used:       {title: "GPU memory used",    unit: "MiB"},
+  power:          {title: "Power",              unit: "W"},
+  clock:          {title: "CPU clock",          unit: "MHz"},
+  clock_graphics: {title: "GPU graphics clock", unit: "MHz"},
+  clock_memory:   {title: "GPU memory clock",   unit: "MHz"},
+  clock_sm:       {title: "GPU SM clock",       unit: "MHz"},
+  rpm:            {title: "Fan RPM",            unit: "rpm"},
+  fan:            {title: "GPU fan duty",       unit: "%"},
+  voltage:        {title: "Voltage",            unit: "V"},
+  current:        {title: "Current",            unit: "A"},
+  wear:           {title: "SSD wear",           unit: "%"},
+  spare:          {title: "SSD spare",          unit: "%"},
+};
+
+const DEFAULT_METRICS = new Set(["temp", "util", "util_gpu", "power", "clock", "clock_graphics", "rpm"]);
+const COMPONENTS = ["cpu", "ram", "ssd", "gpu"];
+const COMPONENT_FOR_SOURCE = (src) => {
+  if (src === "nvidia") return "gpu";
+  if (src === "cpu") return "cpu";
+  if (src === "disk") return "ssd";
+  if (src.startsWith("hwmon:")) {
+    const name = src.slice(6);
+    if (name === "coretemp") return "cpu";
+    if (name.startsWith("nvme")) return "ssd";
+    if (name === "spd5118") return "ram";
+    return "cpu"; // motherboard/super-IO -> CPU bucket
+  }
+  return "cpu";
+};
+
+let selectedRunId = null;
+const enabledMetrics = new Set(DEFAULT_METRICS);
+const enabledComponents = new Set(COMPONENTS);
+const enabledSources = new Set();
+
+// ---------- sidebar ----------
+function renderRuns() {
+  const el = document.getElementById('runs-list');
+  if (!DATA.runs.length) { el.innerHTML = '<div class="empty">No runs yet.</div>'; return; }
+  el.innerHTML = DATA.runs.map(r => `
+    <div class="run-item ${r.id === selectedRunId ? 'active' : ''}" data-id="${r.id}">
+      <label>
+        <input type="radio" name="run" ${r.id === selectedRunId ? 'checked' : ''} data-id="${r.id}">
+        <div>
+          <div><span class="run-id">#${r.id}</span> ${r.label || ''} <span class="run-meta">[${r.mode}]</span></div>
+          <div class="run-meta">${r.started_at} · ${r.hostname || ''}</div>
+        </div>
+      </label>
+    </div>
+  `).join('');
+  el.querySelectorAll('input[name="run"]').forEach(inp => {
+    inp.addEventListener('change', () => { selectRun(parseInt(inp.dataset.id)); });
+  });
+}
+
+function renderComponentFilter() {
+  const el = document.getElementById('component-filter');
+  el.innerHTML = COMPONENTS.map(c => `
+    <label><input type="checkbox" data-component="${c}" ${enabledComponents.has(c)?'checked':''}> ${c.toUpperCase()}</label>
+  `).join('');
+  el.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const c = inp.dataset.component;
+      if (inp.checked) enabledComponents.add(c); else enabledComponents.delete(c);
+      renderSourceFilter();
+      renderMain();
+    });
+  });
+}
+
+function renderMetricFilter() {
+  const el = document.getElementById('metric-filter');
+  const run = currentRun();
+  const present = new Set();
+  if (run) {
+    for (const src of Object.keys(run.series || {})) {
+      for (const m of Object.keys(run.series[src])) present.add(m);
+    }
+  }
+  const all = Array.from(present).sort();
+  el.innerHTML = all.map(m => `
+    <label><input type="checkbox" data-metric="${m}" ${enabledMetrics.has(m)?'checked':''}>
+      ${METRIC_CHARTS[m] ? METRIC_CHARTS[m].title : m} <span style="color:var(--muted)">(${m})</span></label>
+  `).join('') || '<div style="color:var(--muted)">— no samples —</div>';
+  el.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const m = inp.dataset.metric;
+      if (inp.checked) enabledMetrics.add(m); else enabledMetrics.delete(m);
+      renderMain();
+    });
+  });
+}
+
+function renderSourceFilter() {
+  const el = document.getElementById('source-filter');
+  const run = currentRun();
+  if (!run) { el.innerHTML = ''; return; }
+  const sources = Object.keys(run.series || {}).sort()
+    .filter(s => enabledComponents.has(COMPONENT_FOR_SOURCE(s)));
+  // First time we see a source, enable it by default
+  for (const s of sources) if (!enabledSources.has(s) && enabledSources.size < 100) enabledSources.add(s);
+  el.innerHTML = sources.map(s => `
+    <label><input type="checkbox" data-source="${s}" ${enabledSources.has(s)?'checked':''}> ${s}</label>
+  `).join('') || '<div style="color:var(--muted)">—</div>';
+  el.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const s = inp.dataset.source;
+      if (inp.checked) enabledSources.add(s); else enabledSources.delete(s);
+      renderMain();
+    });
+  });
+}
+
+function currentRun() {
+  if (selectedRunId == null) return null;
+  return DATA.runs.find(r => r.id === selectedRunId) || null;
+}
+
+function selectRun(id) {
+  selectedRunId = id;
+  // reset source set so it re-populates from the new run
+  enabledSources.clear();
+  renderRuns();
+  renderMetricFilter();
+  renderSourceFilter();
+  renderMain();
+}
+
+// ---------- main ----------
+function isoSecToDate(ts) { return new Date(ts * 1000); }
+
+function renderMain() {
+  const main = document.getElementById('main-content');
+  const run = currentRun();
+  if (!run) { main.innerHTML = '<div class="empty">Select a run on the left.</div>'; return; }
+  // Compute time range from benchmarks (fallback to first/last sample)
+  let benchSpans = run.benchmarks.filter(b => b.started_at && b.ended_at)
+      .map(b => ({name: b.name, start: new Date(b.started_at), end: new Date(b.ended_at), component: b.component}));
+
+  // Build charts per metric
+  const sectionsHtml = ['<div class="stack">'];
+  sectionsHtml.push(`<div><strong>Run #${run.id}</strong> <span style="color:var(--muted)">· ${run.label || ''} · ${run.mode} · ${run.hostname || ''} · started ${run.started_at}</span></div>`);
+
+  // System info card
+  sectionsHtml.push(renderSystemInfo(run));
+
+  // Charts
+  const metricsToPlot = Array.from(enabledMetrics).filter(m => {
+    return Object.values(run.series).some(srcMet => srcMet[m]);
+  });
+  if (!metricsToPlot.length) {
+    sectionsHtml.push('<div class="empty">No metrics selected.</div>');
+  }
+  for (const metric of metricsToPlot) {
+    sectionsHtml.push(`<div class="chart"><div class="chart-title">${(METRIC_CHARTS[metric]||{}).title || metric}</div><div id="chart-${metric}" style="height: 280px;"></div></div>`);
+  }
+
+  // Benchmarks table
+  sectionsHtml.push(`<h2>Benchmarks</h2>`);
+  sectionsHtml.push(renderBenchmarksTable(run));
+  sectionsHtml.push('</div>');
+  main.innerHTML = sectionsHtml.join('');
+
+  // Now draw each chart
+  for (const metric of metricsToPlot) {
+    drawMetricChart(metric, run, benchSpans);
+  }
+}
+
+function renderSystemInfo(run) {
+  const si = run.system_info || {};
+  const gpus = (si.gpus || []).join('<br>');
+  const mem = si.mem_total_kib ? `${(si.mem_total_kib/1024/1024).toFixed(1)} GiB` : '—';
+  return `<table style="margin-bottom: 16px;">
+    <tr><th style="width:120px">CPU</th><td>${si.cpu_model || si.cpu || '—'}</td></tr>
+    <tr><th>RAM</th><td>${mem}</td></tr>
+    <tr><th>GPU</th><td>${gpus || '—'}</td></tr>
+    <tr><th>Python</th><td>${si.python || '—'}</td></tr>
+    <tr><th>Platform</th><td>${si.platform || '—'}</td></tr>
+  </table>`;
+}
+
+function drawMetricChart(metric, run, benchSpans) {
+  const traces = [];
+  for (const [source, metMap] of Object.entries(run.series)) {
+    if (!enabledSources.has(source)) continue;
+    if (!metMap[metric]) continue;
+    if (!enabledComponents.has(COMPONENT_FOR_SOURCE(source))) continue;
+    for (const [label, s] of Object.entries(metMap[metric])) {
+      const x = s.t.map(isoSecToDate);
+      traces.push({
+        x, y: s.v,
+        type: 'scatter', mode: 'lines',
+        name: `${source}:${label}`,
+        hovertemplate: `%{y:.1f} ${s.unit || ''}<extra>${source}:${label}</extra>`,
+      });
+    }
+  }
+  // Bench span shading
+  const shapes = benchSpans.map((b, i) => ({
+    type: 'rect', xref: 'x', yref: 'paper',
+    x0: b.start, x1: b.end, y0: 0, y1: 1,
+    fillcolor: 'rgba(88, 166, 255, 0.08)',
+    line: {width: 0},
+    layer: 'below',
+  }));
+  const annotations = benchSpans.map((b, i) => ({
+    x: new Date((b.start.getTime() + b.end.getTime()) / 2),
+    y: 1.02, yref: 'paper', xref: 'x',
+    text: b.name, showarrow: false,
+    font: {size: 9, color: '#8b949e'},
+    textangle: -25, yanchor: 'bottom',
+  }));
+  Plotly.newPlot(`chart-${metric}`, traces, {
+    margin: {l: 50, r: 16, t: 28, b: 36},
+    paper_bgcolor: '#161b22', plot_bgcolor: '#0e1116',
+    font: {color: '#e6edf3', size: 11},
+    xaxis: {gridcolor: '#232a33', zerolinecolor: '#232a33'},
+    yaxis: {gridcolor: '#232a33', zerolinecolor: '#232a33',
+            title: (METRIC_CHARTS[metric]||{}).unit || ''},
+    shapes, annotations,
+    showlegend: true,
+    legend: {bgcolor: 'rgba(0,0,0,0)', font: {size: 10}, orientation: 'h', y: -0.2},
+  }, {displaylogo: false, responsive: true});
+}
+
+function renderBenchmarksTable(run) {
+  if (!run.benchmarks.length) return '<div class="empty">No benchmarks recorded.</div>';
+  const rows = run.benchmarks.map(b => {
+    const statusCls = b.status === 'ok' ? 'ok' : (b.status === 'error' ? 'error' : 'skipped');
+    const dur = (b.started_at && b.ended_at)
+      ? ((new Date(b.ended_at) - new Date(b.started_at)) / 1000).toFixed(1) + 's' : '—';
+    const summary = summariseResults(b);
+    return `<tr>
+      <td>${b.id}</td>
+      <td><code>${b.name}</code></td>
+      <td>${b.component}</td>
+      <td><span class="badge ${statusCls}">${b.status}</span></td>
+      <td>${dur}</td>
+      <td>${summary}</td>
+    </tr>`;
+  }).join('');
+  return `<table>
+    <thead><tr><th>id</th><th>benchmark</th><th>component</th><th>status</th><th>elapsed</th><th>headline</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function summariseResults(b) {
+  if (b.error) return `<span style="color:var(--red)">${b.error}</span>`;
+  const r = b.results || {};
+  if (r.skipped) return `<em style="color:var(--yellow)">skipped: ${r.skipped}</em>`;
+  // Try a few well-known shapes
+  if (r.bf16) return `bf16: ${r.bf16.tflops.toFixed(1)} TFLOPs · fp16: ${r.fp16.tflops.toFixed(1)} · tf32: ${r.tf32.tflops.toFixed(1)} · fp32: ${r.fp32.tflops.toFixed(1)}`;
+  if (r.images_per_second != null) return `${r.images_per_second.toFixed(1)} img/s${r.mode?` (${r.mode})`:''}`;
+  if (r.tokens_per_second != null) return `${r.tokens_per_second.toFixed(0)} tok/s · ${r.steps_per_second.toFixed(2)} step/s`;
+  if (r.sequences_per_second != null) return `${r.sequences_per_second.toFixed(1)} seq/s`;
+  if (r.events_per_second != null) return `${r.events_per_second.toFixed(0)} events/s`;
+  if (r.bandwidth_mib_s != null && typeof r.bandwidth_mib_s === 'number') return `${r.bandwidth_mib_s.toFixed(0)} MiB/s`;
+  if (r.bandwidth_mib_s && typeof r.bandwidth_mib_s === 'object') {
+    return Object.entries(r.bandwidth_mib_s).map(([k,v]) => `${k}: ${v.toFixed(0)} MiB/s`).join(' · ');
+  }
+  if (r.copy_mb_s != null) return `Copy ${r.copy_mb_s.toFixed(0)} · Triad ${r.triad_mb_s?.toFixed(0) || '—'} MB/s`;
+  if (r.iops != null) return `${(r.iops/1000).toFixed(1)}k IOPS · ${r.bw_mib_s.toFixed(0)} MiB/s · lat p99 ${(r.lat_ns_p99/1e6).toFixed(2)} ms`;
+  if (r.bw_mib_s != null) return `${r.bw_mib_s.toFixed(0)} MiB/s`;
+  if (r.models) {
+    return Object.entries(r.models).map(([m, v]) =>
+      v.error ? `${m}: error` : `${m}: ${v.gen_tokens_per_second?.toFixed(1)} tok/s`
+    ).join(' · ');
+  }
+  if (r.allocated_mib != null) return `allocated ${r.allocated_mib.toFixed(0)} MiB / ${r.total_mib.toFixed(0)} MiB`;
+  if (r.tflops_avg != null) return `${r.tflops_avg.toFixed(1)} TFLOPs avg (${r.iters} iters)`;
+  return `<pre class="json">${escapeHtml(JSON.stringify(r, null, 2))}</pre>`;
+}
+
+function escapeHtml(s) { return s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+// ---------- boot ----------
+renderRuns();
+renderComponentFilter();
+if (DATA.runs.length) selectRun(DATA.runs[0].id);
+</script>
+</body>
+</html>
