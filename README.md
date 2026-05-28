@@ -11,8 +11,11 @@ End-to-end Linux benchmarking suite. CPU, RAM, SSD, NVIDIA GPU (CUDA / PyTorch /
 # One-time: detect sensors
 sudo sensors-detect --auto
 
-# Python deps incl. PyTorch + CUDA for RTX 50-series (Blackwell, cu126)
+# Python deps incl. PyTorch + CUDA for RTX 50-series (Blackwell, cu128)
 uv sync --extra gpu
+
+# Optional: also install the dev extras (pytest + pytest-cov) for running tests
+uv sync --extra gpu --extra dev
 ```
 
 ## Use
@@ -74,3 +77,28 @@ benchpilot/
   report/
     generator.py    Jinja2 + Plotly dashboard
 ```
+
+## Tests
+
+```bash
+# Install the test deps (uses the in-project ./uv_cache and ./.venv)
+uv sync --extra gpu --extra dev
+
+# Default suite — no CUDA, no system tools required (mocked at boundaries)
+uv run pytest
+
+# With coverage
+uv run pytest --cov=benchpilot --cov-report=term-missing
+
+# Opt-in GPU integration tests (real torch on the local CUDA device)
+uv run pytest -m gpu
+```
+
+The suite is in `tests/` mirroring the source layout. Tests use these markers (declared in `pyproject.toml`):
+
+- `gpu` — exercises real CUDA torch; skipped automatically when `torch.cuda.is_available()` is False.
+- `system_tools` — would call `sysbench`/`fio`/`mbw`/`stress-ng` for real (most tests instead mock `benchpilot.benchmarks._shell.run`).
+- `slow` — long-running integration paths.
+
+Default `pytest` (no `-m` flag) runs the fast hermetic ~120 tests in under 20 s — they mock `subprocess`, `httpx`, `nvidia-smi`, and use a temp-dir SQLite. Coverage on a default run is ~84 %; the remaining ~16 % is gated GPU/ML code (`benchmarks/gpu/{hf_inference,image_gen,vram_stress}.py`) which is exercised by `pytest -m gpu` on a CUDA-capable machine.
+

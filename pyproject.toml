@@ -26,6 +26,19 @@ gpu = [
     "safetensors>=0.4",
     "sentencepiece>=0.2",
 ]
+dev = [
+    "pytest>=8",
+    "pytest-cov>=5",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "gpu: requires CUDA torch (skipped if torch.cuda.is_available() is False)",
+    "system_tools: requires sysbench/fio/mbw/stress-ng installed",
+    "slow: long-running integration",
+]
+addopts = "-q --strict-markers"
 
 [project.scripts]
 benchpilot = "benchpilot.cli:app"

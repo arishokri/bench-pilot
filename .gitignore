@@ -17,3 +17,8 @@ uv_cache/
 benchpilot.egg-info/
 dist/
 build/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.pytest_cache/
