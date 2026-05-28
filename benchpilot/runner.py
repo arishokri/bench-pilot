@@ -4,7 +4,9 @@ import os
 import platform
 import socket
 import subprocess
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -158,6 +160,73 @@ def _execute(plan: Iterable[Benchmark], *, storage: Storage, run_id: int, consol
     return RunSummary(run_id=run_id, benchmarks_ok=ok, benchmarks_failed=failed, benchmarks_skipped=skipped)
 
 
+def _execute_concurrent(
+    plan: Iterable[Benchmark], *, storage: Storage, run_id: int, console: Console,
+) -> RunSummary:
+    """Run every benchmark in `plan` in its own thread so they overlap in time.
+
+    Used by stress mode where the goal is *simultaneous* component load
+    (worst-case thermals, PSU pull, shared-resource contention), not isolated
+    measurement.
+    """
+    items = list(plan)
+    if not items:
+        return RunSummary(run_id=run_id, benchmarks_ok=0, benchmarks_failed=0, benchmarks_skipped=0)
+
+    # Tallies are touched from worker threads; guard with a lock.
+    counts = {"ok": 0, "failed": 0, "skipped": 0}
+    counts_lock = threading.Lock()
+
+    def run_one(bench: Benchmark) -> tuple[str, str, str | None]:
+        bench_id = storage.start_benchmark(
+            run_id, name=bench.name, component=bench.component, params=bench.params(),
+        )
+        try:
+            result = bench.run()
+        except Exception as e:  # noqa: BLE001
+            storage.finish_benchmark(bench_id, status="error", error=str(e))
+            with counts_lock:
+                counts["failed"] += 1
+            return ("error", bench.name, str(e))
+        res = result.results
+        if isinstance(res, dict) and res.get("skipped"):
+            storage.finish_benchmark(bench_id, status="skipped", results=res)
+            with counts_lock:
+                counts["skipped"] += 1
+            return ("skipped", bench.name, str(res.get("skipped")))
+        storage.finish_benchmark(bench_id, status="ok", results=res)
+        with counts_lock:
+            counts["ok"] += 1
+        return ("ok", bench.name, None)
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[bold blue]{task.description}"),
+        BarColumn(),
+        TextColumn("{task.fields[status]}"),
+        TimeElapsedColumn(),
+        console=console,
+        transient=False,
+    ) as progress:
+        bench_tasks = {b.name: progress.add_task(b.name, total=None, status="…") for b in items}
+        with ThreadPoolExecutor(max_workers=len(items)) as ex:
+            futures = {ex.submit(run_one, b): b for b in items}
+            for fut in as_completed(futures):
+                status, name, info = fut.result()
+                if status == "ok":
+                    progress.update(bench_tasks[name], status="[green]✓", completed=1, total=1)
+                elif status == "skipped":
+                    progress.update(bench_tasks[name], status=f"[yellow]– {info}", completed=1, total=1)
+                else:
+                    progress.update(bench_tasks[name], status=f"[red]✗ {info}", completed=1, total=1)
+    return RunSummary(
+        run_id=run_id,
+        benchmarks_ok=counts["ok"],
+        benchmarks_failed=counts["failed"],
+        benchmarks_skipped=counts["skipped"],
+    )
+
+
 def run_benchmarks(cfg: RunConfig, console: Console | None = None) -> RunSummary:
     console = console or Console()
     _prepare_scratch_dirs(fio_dir=cfg.ssd_target_dir, hf_dir=cfg.hf_cache_dir)
@@ -195,7 +264,7 @@ def run_stress(cfg: StressConfig, console: Console | None = None) -> RunSummary:
     try:
         _render_sysinfo(console, sysinfo)
         plan = build_stress_plan(cfg)
-        summary = _execute(plan, storage=storage, run_id=run_id, console=console)
+        summary = _execute_concurrent(plan, storage=storage, run_id=run_id, console=console)
     finally:
         sampler.stop()
         storage.end_run(run_id)

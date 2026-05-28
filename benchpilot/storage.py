@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 import time
 from contextlib import contextmanager
 from pathlib import Path
@@ -53,7 +54,15 @@ def _iso(ts: float | None = None) -> str:
 
 
 class Storage:
-    """Thin SQLite wrapper. One connection per process; WAL for concurrent sampler writes."""
+    """Thin SQLite wrapper. One connection per process; WAL for concurrent sampler writes.
+
+    A single threading.Lock serialises every mutating call. Python's sqlite3 cursors
+    are not safe for concurrent INSERT-then-read-lastrowid sequences from multiple
+    threads on a shared connection — the second thread's INSERT can clobber the first
+    thread's `cursor.lastrowid` before it's read, so concurrent `start_benchmark`
+    callers ended up with the same rowid and the loser's `finish_benchmark` UPDATE
+    landed on the winner's row, leaving the loser stuck in 'running'.
+    """
 
     def __init__(self, db_path: Path):
         self.db_path = db_path
@@ -62,20 +71,23 @@ class Storage:
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=NORMAL")
         self._conn.executescript(SCHEMA)
+        self._write_lock = threading.Lock()
 
     def close(self) -> None:
         self._conn.close()
 
     # ---------- runs ----------
     def start_run(self, *, mode: str, label: str | None, hostname: str, system_info: dict) -> int:
-        cur = self._conn.execute(
-            "INSERT INTO runs(started_at, label, mode, hostname, system_info_json) VALUES(?,?,?,?,?)",
-            (_iso(), label, mode, hostname, json.dumps(system_info)),
-        )
-        return cur.lastrowid
+        with self._write_lock:
+            cur = self._conn.execute(
+                "INSERT INTO runs(started_at, label, mode, hostname, system_info_json) VALUES(?,?,?,?,?)",
+                (_iso(), label, mode, hostname, json.dumps(system_info)),
+            )
+            return cur.lastrowid
 
     def end_run(self, run_id: int) -> None:
-        self._conn.execute("UPDATE runs SET ended_at=? WHERE id=?", (_iso(), run_id))
+        with self._write_lock:
+            self._conn.execute("UPDATE runs SET ended_at=? WHERE id=?", (_iso(), run_id))
 
     def list_runs(self) -> list[dict]:
         cur = self._conn.execute(
@@ -97,12 +109,13 @@ class Storage:
 
     # ---------- benchmarks ----------
     def start_benchmark(self, run_id: int, *, name: str, component: str, params: dict) -> int:
-        cur = self._conn.execute(
-            "INSERT INTO benchmarks(run_id, name, component, started_at, status, params_json) "
-            "VALUES(?,?,?,?,?,?)",
-            (run_id, name, component, _iso(), "running", json.dumps(params)),
-        )
-        return cur.lastrowid
+        with self._write_lock:
+            cur = self._conn.execute(
+                "INSERT INTO benchmarks(run_id, name, component, started_at, status, params_json) "
+                "VALUES(?,?,?,?,?,?)",
+                (run_id, name, component, _iso(), "running", json.dumps(params)),
+            )
+            return cur.lastrowid
 
     def finish_benchmark(
         self,
@@ -112,10 +125,11 @@ class Storage:
         results: dict | None = None,
         error: str | None = None,
     ) -> None:
-        self._conn.execute(
-            "UPDATE benchmarks SET ended_at=?, status=?, results_json=?, error=? WHERE id=?",
-            (_iso(), status, json.dumps(results) if results else None, error, bench_id),
-        )
+        with self._write_lock:
+            self._conn.execute(
+                "UPDATE benchmarks SET ended_at=?, status=?, results_json=?, error=? WHERE id=?",
+                (_iso(), status, json.dumps(results) if results else None, error, bench_id),
+            )
 
     def benchmarks_for_run(self, run_id: int) -> list[dict]:
         cur = self._conn.execute(
@@ -134,10 +148,11 @@ class Storage:
     # ---------- samples ----------
     def insert_samples(self, rows: Iterable[tuple]) -> None:
         # rows: (run_id, ts, source, metric, label, value, unit)
-        self._conn.executemany(
-            "INSERT INTO samples(run_id, ts, source, metric, label, value, unit) VALUES(?,?,?,?,?,?,?)",
-            rows,
-        )
+        with self._write_lock:
+            self._conn.executemany(
+                "INSERT INTO samples(run_id, ts, source, metric, label, value, unit) VALUES(?,?,?,?,?,?,?)",
+                rows,
+            )
 
     def samples_for_run(self, run_id: int) -> list[dict]:
         cur = self._conn.execute(

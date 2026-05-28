@@ -139,10 +139,13 @@ class GpuStress:
         torch.cuda.synchronize()
         start = time.monotonic()
         iters = 0
+        # Synchronise each iteration so the queue stays bounded — otherwise dispatch
+        # vastly outpaces execution and `duration_seconds` overshoots while the
+        # final synchronize drains the backlog (important for concurrent stress mode).
         while (time.monotonic() - start) < self.duration_seconds:
             c = a @ b
+            torch.cuda.synchronize()
             iters += 1
-        torch.cuda.synchronize()
         elapsed = time.monotonic() - start
         # 2*N^3 FLOPs per matmul
         tflops = (2 * self.matrix ** 3 * iters) / elapsed / 1e12
