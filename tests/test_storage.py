@@ -100,11 +100,7 @@ def test_transaction_rollback(temp_db):
     assert temp_db.benchmarks_for_run(run_id) == []
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason="On `main`, Storage doesn't lock writes — concurrent start_benchmark "
-           "calls race on cursor.lastrowid; fixed in feature/concurrent via threading.Lock.",
-)
+
 def test_concurrent_writers_each_get_unique_ids_and_finish_ok(temp_db):
     """Spawn N threads, each starting + finishing K benchmarks. On a race-free
     Storage every row ends with status=ok and ended_at non-null, and every
