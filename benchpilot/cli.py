@@ -14,7 +14,11 @@ from benchpilot.report.generator import generate_report
 from benchpilot.runner import run_benchmarks, run_stress
 from benchpilot.storage import Storage
 
-app = typer.Typer(add_completion=False, no_args_is_help=True, help="Linux benchmarking suite: CPU / RAM / SSD / NVIDIA GPU.")
+app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help="Linux benchmarking suite: CPU / RAM / SSD / NVIDIA GPU.",
+)
 console = Console()
 
 
@@ -42,15 +46,37 @@ def _parse_duration(value: str) -> int:
 
 @app.command("run")
 def cmd_run(
-    components: Optional[str] = typer.Option(None, "--components", "-c", help="Comma list: cpu,ram,ssd,gpu (default: all)."),
-    quick: bool = typer.Option(True, "--quick/--full", help="Quick run (~3 min) vs full sweep."),
-    label: Optional[str] = typer.Option(None, "--label", "-l", help="Human label saved with the run."),
+    components: Optional[str] = typer.Option(
+        None, "--components", "-c", help="Comma list: cpu,ram,ssd,gpu (default: all)."
+    ),
+    quick: bool = typer.Option(
+        True, "--quick/--full", help="Quick run (~3 min) vs full sweep."
+    ),
+    label: Optional[str] = typer.Option(
+        None, "--label", "-l", help="Human label saved with the run."
+    ),
     data_dir: Path = typer.Option(Path("./data"), "--data-dir"),
-    ssd_dir: Optional[Path] = typer.Option(None, "--ssd-dir", help="Where fio creates its scratch file (defaults to ./fio_scratch)."),
-    hf_cache_dir: Optional[Path] = typer.Option(None, "--hf-cache-dir", help="HuggingFace download cache (defaults to ./hf_cache). Sets HF_HOME for the run."),
-    no_image_gen: bool = typer.Option(False, "--no-image-gen", help="Skip the SD-turbo test."),
-    ollama_models: Optional[str] = typer.Option(None, "--ollama-models", help="Comma list of ollama model tags to bench (e.g. 'qwen3.5:2b,gemma4:e2b'). Default: auto-pick smallest 2."),
-    sample_interval: float = typer.Option(1.0, "--sample-interval", help="Sensor sampling interval seconds."),
+    ssd_dir: Optional[Path] = typer.Option(
+        None,
+        "--ssd-dir",
+        help="Where fio creates its scratch file (defaults to ./fio_scratch).",
+    ),
+    hf_cache_dir: Optional[Path] = typer.Option(
+        None,
+        "--hf-cache-dir",
+        help="HuggingFace download cache (defaults to ./hf_cache). Sets HF_HOME for the run.",
+    ),
+    no_image_gen: bool = typer.Option(
+        False, "--no-image-gen", help="Skip the SD-turbo test."
+    ),
+    ollama_models: Optional[str] = typer.Option(
+        None,
+        "--ollama-models",
+        help="Comma list of ollama model tags to bench (e.g. 'qwen3.5:2b,gemma4:e2b'). Default: auto-pick smallest 2.",
+    ),
+    sample_interval: float = typer.Option(
+        1.0, "--sample-interval", help="Sensor sampling interval seconds."
+    ),
 ) -> None:
     """Run benchmarks against selected components, sampling sensors throughout."""
     cfg = RunConfig(
@@ -59,7 +85,9 @@ def cmd_run(
         label=label,
         data_dir=data_dir,
         include_image_gen=not no_image_gen,
-        ollama_models=tuple(s.strip() for s in (ollama_models or "").split(",") if s.strip()),
+        ollama_models=tuple(
+            s.strip() for s in (ollama_models or "").split(",") if s.strip()
+        ),
         sample_interval=sample_interval,
     )
     if ssd_dir is not None:
@@ -71,15 +99,19 @@ def cmd_run(
 
 @app.command("stress")
 def cmd_stress(
-    duration: str = typer.Option("2m", "--duration", "-d", help="How long to stress (e.g. 90s, 5m, 1h)."),
-    components: Optional[str] = typer.Option("cpu", "--components", "-c", help="Comma list: cpu,ram,ssd,gpu."),
+    duration: str = typer.Option(
+        "2m", "--duration", "-d", help="How long to stress (e.g. 90s, 5m, 1h)."
+    ),
+    components: Optional[str] = typer.Option(
+        "cpu", "--components", "-c", help="Comma list: cpu,ram,ssd,gpu."
+    ),
     label: Optional[str] = typer.Option(None, "--label", "-l"),
     data_dir: Path = typer.Option(Path("./data"), "--data-dir"),
     ssd_dir: Optional[Path] = typer.Option(None, "--ssd-dir"),
     hf_cache_dir: Optional[Path] = typer.Option(None, "--hf-cache-dir"),
     sample_interval: float = typer.Option(1.0, "--sample-interval"),
 ) -> None:
-    """Time-based stress test for thermal characterisation."""
+    """Time-based stress test for thermal characterization."""
     cfg = StressConfig(
         duration_seconds=_parse_duration(duration),
         components=_parse_components(components),
@@ -109,7 +141,14 @@ def cmd_list(
     t.add_column("label")
     t.add_column("host")
     for r in runs:
-        t.add_row(str(r["id"]), r["started_at"] or "", r["ended_at"] or "—", r["mode"], r["label"] or "", r["hostname"] or "")
+        t.add_row(
+            str(r["id"]),
+            r["started_at"] or "",
+            r["ended_at"] or "—",
+            r["mode"],
+            r["label"] or "",
+            r["hostname"] or "",
+        )
     console.print(t)
     storage.close()
 
@@ -118,13 +157,19 @@ def cmd_list(
 def cmd_report(
     data_dir: Path = typer.Option(Path("./data"), "--data-dir"),
     report_dir: Path = typer.Option(Path("./reports"), "--report-dir"),
-    open_browser: bool = typer.Option(False, "--open/--no-open", help="Open the report in your default browser."),
-    only: Optional[str] = typer.Option(None, "--only", help="Comma list of run ids; default: all."),
+    open_browser: bool = typer.Option(
+        False, "--open/--no-open", help="Open the report in your default browser."
+    ),
+    only: Optional[str] = typer.Option(
+        None, "--only", help="Comma list of run ids; default: all."
+    ),
 ) -> None:
     """Generate a self-contained HTML dashboard from the recorded runs."""
     db = data_dir / "benchpilot.db"
     if not db.exists():
-        raise typer.BadParameter(f"no database at {db}; run `benchpilot run --quick` first")
+        raise typer.BadParameter(
+            f"no database at {db}; run `benchpilot run --quick` first"
+        )
     run_ids: list[int] | None = None
     if only:
         run_ids = [int(x) for x in only.split(",") if x.strip()]
