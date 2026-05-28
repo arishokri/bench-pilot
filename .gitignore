@@ -1,7 +1,7 @@
 .venv/
 __pycache__/
 *.pyc
-.benchpilot/
+.benchpress/
 data/
 reports/
 fio_scratch/
@@ -14,7 +14,7 @@ uv_cache/
 .idea/
 .vscode/
 .cache/
-benchpilot.egg-info/
+benchpress.egg-info/
 dist/
 build/
 .coverage

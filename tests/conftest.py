@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from benchpilot.storage import Storage
+from benchpress.storage import Storage
 
 
 # ---------- storage ----------
@@ -46,7 +46,7 @@ def fake_hwmon(tmp_path: Path, monkeypatch):
             for fname, content in entries.items():
                 (d / fname).write_text(content)
         # Patch the module-level _HWMON pointer
-        from benchpilot.monitor import hwmon as hwmod
+        from benchpress.monitor import hwmon as hwmod
         monkeypatch.setattr(hwmod, "_HWMON", root)
         return root
 
@@ -63,11 +63,11 @@ class _CapturedShell:
 
 @pytest.fixture
 def mock_shell(monkeypatch):
-    """Patch benchpilot.benchmarks._shell.run AND its already-imported aliases
+    """Patch benchpress.benchmarks._shell.run AND its already-imported aliases
     so callers can assert what cmdline was constructed. Returns a function
     set_result(stdout="", stderr="", returncode=0) plus a `captured` record.
     """
-    from benchpilot.benchmarks import _shell
+    from benchpress.benchmarks import _shell
 
     captured = _CapturedShell()
     result = {"stdout": "", "stderr": "", "returncode": 0}
@@ -84,10 +84,10 @@ def mock_shell(monkeypatch):
     # Patch the module attribute *and* every benchmark module that already imported `run` by name.
     monkeypatch.setattr(_shell, "run", fake_run)
     for mod_name in (
-        "benchpilot.benchmarks.cpu",
-        "benchpilot.benchmarks.ram",
-        "benchpilot.benchmarks.ssd",
-        "benchpilot.benchmarks.stress",
+        "benchpress.benchmarks.cpu",
+        "benchpress.benchmarks.ram",
+        "benchpress.benchmarks.ssd",
+        "benchpress.benchmarks.stress",
     ):
         import importlib
         mod = importlib.import_module(mod_name)
@@ -99,10 +99,10 @@ def mock_shell(monkeypatch):
         return f"/usr/bin/{tool}"
     monkeypatch.setattr(_shell, "require", fake_require)
     for mod_name in (
-        "benchpilot.benchmarks.cpu",
-        "benchpilot.benchmarks.ram",
-        "benchpilot.benchmarks.ssd",
-        "benchpilot.benchmarks.stress",
+        "benchpress.benchmarks.cpu",
+        "benchpress.benchmarks.ram",
+        "benchpress.benchmarks.ssd",
+        "benchpress.benchmarks.stress",
     ):
         import importlib
         mod = importlib.import_module(mod_name)

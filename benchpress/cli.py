@@ -9,10 +9,10 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from benchpilot.config import COMPONENTS, RunConfig, StressConfig
-from benchpilot.report.generator import generate_report
-from benchpilot.runner import run_benchmarks, run_stress
-from benchpilot.storage import Storage
+from benchpress.config import COMPONENTS, RunConfig, StressConfig
+from benchpress.report.generator import generate_report
+from benchpress.runner import run_benchmarks, run_stress
+from benchpress.storage import Storage
 
 app = typer.Typer(
     add_completion=False,
@@ -128,7 +128,7 @@ def cmd_list(
     data_dir: Path = typer.Option(Path("./data"), "--data-dir"),
 ) -> None:
     """List previous runs."""
-    storage = Storage(data_dir / "benchpilot.db")
+    storage = Storage(data_dir / "benchpress.db")
     runs = storage.list_runs()
     t = Table(title="Runs")
     t.add_column("id", justify="right")
@@ -162,10 +162,10 @@ def cmd_report(
     ),
 ) -> None:
     """Generate a self-contained HTML dashboard from the recorded runs."""
-    db = data_dir / "benchpilot.db"
+    db = data_dir / "benchpress.db"
     if not db.exists():
         raise typer.BadParameter(
-            f"no database at {db}; run `benchpilot run --quick` first"
+            f"no database at {db}; run `benchpress run --quick` first"
         )
     run_ids: list[int] | None = None
     if only:

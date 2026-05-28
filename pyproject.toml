@@ -1,6 +1,6 @@
 [project]
-name = "benchpilot"
-version = "0.1.0"
+name = "benchpress"
+version = "0.2.0"
 description = "Linux end-to-end benchmarking suite (CPU / RAM / SSD / NVIDIA GPU) with sensor telemetry and dashboard report."
 requires-python = ">=3.11,<3.14"
 readme = "README.md"
@@ -41,14 +41,14 @@ markers = [
 addopts = "-q --strict-markers"
 
 [project.scripts]
-benchpilot = "benchpilot.cli:app"
+benchpress = "benchpress.cli:app"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["benchpilot"]
+packages = ["benchpress"]
 
 # uv: keep all package downloads + wheel cache inside the project tree.
 [tool.uv]

@@ -2,7 +2,7 @@ import threading
 
 import pytest
 
-from benchpilot.storage import Storage
+from benchpress.storage import Storage
 
 
 def test_schema_creates_tables(temp_db):

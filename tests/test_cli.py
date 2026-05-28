@@ -1,8 +1,8 @@
 import pytest
 from typer.testing import CliRunner
 
-import benchpilot.cli as cli_mod
-from benchpilot.cli import _parse_components, _parse_duration, app
+import benchpress.cli as cli_mod
+from benchpress.cli import _parse_components, _parse_duration, app
 
 
 runner = CliRunner()
@@ -10,7 +10,7 @@ runner = CliRunner()
 
 # ---------- _parse_components ----------
 def test_parse_components_default_is_all():
-    from benchpilot.config import COMPONENTS
+    from benchpress.config import COMPONENTS
     assert _parse_components(None) == COMPONENTS
 
 
@@ -81,7 +81,7 @@ def test_run_forwards_flags_to_runner(monkeypatch, tmp_path):
 
     def fake_run_benchmarks(cfg, console=None):
         captured["cfg"] = cfg
-        from benchpilot.runner import RunSummary
+        from benchpress.runner import RunSummary
         return RunSummary(run_id=1, benchmarks_ok=0, benchmarks_failed=0, benchmarks_skipped=0)
 
     monkeypatch.setattr(cli_mod, "run_benchmarks", fake_run_benchmarks)
@@ -107,7 +107,7 @@ def test_stress_forwards_flags_to_runner(monkeypatch, tmp_path):
 
     def fake_run_stress(cfg, console=None):
         captured["cfg"] = cfg
-        from benchpilot.runner import RunSummary
+        from benchpress.runner import RunSummary
         return RunSummary(run_id=1, benchmarks_ok=0, benchmarks_failed=0, benchmarks_skipped=0)
 
     monkeypatch.setattr(cli_mod, "run_stress", fake_run_stress)

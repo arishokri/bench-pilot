@@ -1,7 +1,7 @@
 import pytest
 
-from benchpilot.monitor import cpu as cpu_mod
-from benchpilot.monitor.cpu import CpuProbe
+from benchpress.monitor import cpu as cpu_mod
+from benchpress.monitor.cpu import CpuProbe
 
 
 # Deltas designed for clean assertions:

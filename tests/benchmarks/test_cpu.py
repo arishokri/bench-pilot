@@ -1,4 +1,4 @@
-from benchpilot.benchmarks.cpu import SysbenchCpu, _parse_sysbench_cpu
+from benchpress.benchmarks.cpu import SysbenchCpu, _parse_sysbench_cpu
 
 
 SYSBENCH_OUTPUT = """\

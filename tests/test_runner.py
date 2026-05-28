@@ -3,10 +3,10 @@ from dataclasses import dataclass
 import pytest
 from rich.console import Console
 
-from benchpilot import runner as runner_mod
-from benchpilot.benchmarks.base import BenchmarkResult
-from benchpilot.config import COMPONENTS, RunConfig
-from benchpilot.runner import (
+from benchpress import runner as runner_mod
+from benchpress.benchmarks.base import BenchmarkResult
+from benchpress.config import COMPONENTS, RunConfig
+from benchpress.runner import (
     _components_suffix,
     _execute,
     _gpu_cleanup,
@@ -18,7 +18,7 @@ from benchpilot.runner import (
 # exist yet. We skip the concurrent-executor tests below rather than fail at
 # collection time.
 try:
-    from benchpilot.runner import _execute_concurrent  # noqa: F401
+    from benchpress.runner import _execute_concurrent  # noqa: F401
     HAS_CONCURRENT_EXECUTOR = True
 except ImportError:
     HAS_CONCURRENT_EXECUTOR = False
@@ -151,8 +151,8 @@ def test_execute_concurrent_runs_all_in_parallel(temp_db):
     """Three benchmarks, each sleeping 100ms. Sequentially they'd take ~300ms;
     concurrently they should fit well under 250ms."""
     import time
-    from benchpilot.benchmarks.base import BenchmarkResult
-    from benchpilot.runner import _execute_concurrent
+    from benchpress.benchmarks.base import BenchmarkResult
+    from benchpress.runner import _execute_concurrent
 
     class _Sleeper:
         def __init__(self, name): self.name = name; self.component = "cpu"
@@ -175,7 +175,7 @@ def test_execute_concurrent_runs_all_in_parallel(temp_db):
 @requires_concurrent_executor
 def test_execute_concurrent_handles_mixed_outcomes(temp_db):
     """One ok, one skipped, one raising — all status fields recorded correctly."""
-    from benchpilot.runner import _execute_concurrent
+    from benchpress.runner import _execute_concurrent
 
     run_id = temp_db.start_run(mode="stress", label="t", hostname="h", system_info={})
     plan = [
@@ -196,7 +196,7 @@ def test_execute_concurrent_handles_mixed_outcomes(temp_db):
 
 @requires_concurrent_executor
 def test_execute_concurrent_empty_plan(temp_db):
-    from benchpilot.runner import _execute_concurrent
+    from benchpress.runner import _execute_concurrent
 
     run_id = temp_db.start_run(mode="stress", label="t", hostname="h", system_info={})
     summary = _execute_concurrent([], storage=temp_db, run_id=run_id,

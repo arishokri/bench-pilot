@@ -1,4 +1,4 @@
-# benchpilot
+# benchpress
 
 End-to-end Linux benchmarking suite. CPU, RAM, SSD, NVIDIA GPU (CUDA / PyTorch / Transformers / Diffusers / Ollama). Records temperature, load, fan RPM, power, clocks and voltage throughout each run and emits a self-contained interactive HTML dashboard.
 
@@ -22,22 +22,22 @@ uv sync --extra gpu --extra dev
 
 ```bash
 # Quick comparable run (~3 min on i9-12900K + RTX 5080)
-uv run benchpilot run --quick
+uv run benchpress run --quick
 
 # Pick components
-uv run benchpilot run --components cpu,gpu
+uv run benchpress run --components cpu,gpu
 
 # Thermal stress test (user-defined duration)
-uv run benchpilot stress --duration 5m --components cpu,gpu
+uv run benchpress stress --duration 5m --components cpu,gpu
 
 # List past runs
-uv run benchpilot list
+uv run benchpress list
 
 # Generate / open dashboard
-uv run benchpilot report --open
+uv run benchpress report --open
 ```
 
-Data lives in `./data/benchpilot.db` (SQLite). The report is a single self-contained HTML file in `./reports/`.
+Data lives in `./data/benchpress.db` (SQLite). The report is a single self-contained HTML file in `./reports/`.
 
 All scratch and downloaded artefacts are kept inside the project:
 - `./fio_scratch/` — fio + stress-ng working files (deleted after each run)
@@ -52,7 +52,7 @@ All scratch and downloaded artefacts are kept inside the project:
 ## Layout
 
 ```
-benchpilot/
+benchpress/
   cli.py            Typer entrypoint
   runner.py         Orchestrates sampler + benchmarks
   storage.py        SQLite schema + writes
@@ -88,7 +88,7 @@ uv sync --extra gpu --extra dev
 uv run pytest
 
 # With coverage
-uv run pytest --cov=benchpilot --cov-report=term-missing
+uv run pytest --cov=benchpress --cov-report=term-missing
 
 # Opt-in GPU integration tests (real torch on the local CUDA device)
 uv run pytest -m gpu
@@ -97,7 +97,7 @@ uv run pytest -m gpu
 The suite is in `tests/` mirroring the source layout. Tests use these markers (declared in `pyproject.toml`):
 
 - `gpu` — exercises real CUDA torch; skipped automatically when `torch.cuda.is_available()` is False.
-- `system_tools` — would call `sysbench`/`fio`/`mbw`/`stress-ng` for real (most tests instead mock `benchpilot.benchmarks._shell.run`).
+- `system_tools` — would call `sysbench`/`fio`/`mbw`/`stress-ng` for real (most tests instead mock `benchpress.benchmarks._shell.run`).
 - `slow` — long-running integration paths.
 
 Default `pytest` (no `-m` flag) runs the fast hermetic ~120 tests in under 20 s — they mock `subprocess`, `httpx`, `nvidia-smi`, and use a temp-dir SQLite. Coverage on a default run is ~84 %; the remaining ~16 % is gated GPU/ML code (`benchmarks/gpu/{hf_inference,image_gen,vram_stress}.py`) which is exercised by `pytest -m gpu` on a CUDA-capable machine.

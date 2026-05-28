@@ -11,7 +11,7 @@ from tests.conftest import requires_gpu
 @requires_gpu
 @pytest.mark.gpu
 def test_bert_inference_returns_throughput():
-    from benchpilot.benchmarks.gpu.hf_inference import BertInference
+    from benchpress.benchmarks.gpu.hf_inference import BertInference
 
     r = BertInference(batch=2, seq_len=32, seconds=0.3).run().results
     assert r["model"] == "bert-base-uncased"
@@ -23,7 +23,7 @@ def test_bert_inference_returns_throughput():
 @requires_gpu
 @pytest.mark.gpu
 def test_vit_inference_returns_throughput():
-    from benchpilot.benchmarks.gpu.hf_inference import VitInference
+    from benchpress.benchmarks.gpu.hf_inference import VitInference
 
     r = VitInference(batch=2, seconds=0.3).run().results
     assert r["model"] == "google/vit-base-patch16-224"

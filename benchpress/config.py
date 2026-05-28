@@ -7,7 +7,7 @@ DEFAULT_DATA_DIR = Path("./data")
 DEFAULT_REPORT_DIR = Path("./reports")
 DEFAULT_FIO_DIR = Path("./fio_scratch")
 DEFAULT_HF_CACHE_DIR = Path("./hf_cache")
-DEFAULT_DB_NAME = "benchpilot.db"
+DEFAULT_DB_NAME = "benchpress.db"
 
 # Components the runner knows about.
 COMPONENTS = ("cpu", "ram", "ssd", "gpu")

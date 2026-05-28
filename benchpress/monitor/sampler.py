@@ -4,11 +4,11 @@ import threading
 import time
 from typing import Protocol
 
-from benchpilot.monitor.cpu import CpuProbe
-from benchpilot.monitor.disk import DiskProbe
-from benchpilot.monitor.hwmon import HwmonProbe
-from benchpilot.monitor.nvidia import NvidiaProbe, available as nvidia_available
-from benchpilot.storage import Storage
+from benchpress.monitor.cpu import CpuProbe
+from benchpress.monitor.disk import DiskProbe
+from benchpress.monitor.hwmon import HwmonProbe
+from benchpress.monitor.nvidia import NvidiaProbe, available as nvidia_available
+from benchpress.storage import Storage
 
 
 class _Probe(Protocol):
@@ -45,7 +45,7 @@ class Sampler:
                 p.sample(time.time())
             except Exception:
                 pass
-        self._thread = threading.Thread(target=self._loop, name="benchpilot-sampler", daemon=True)
+        self._thread = threading.Thread(target=self._loop, name="benchpress-sampler", daemon=True)
         self._thread.start()
 
     def stop(self) -> None:

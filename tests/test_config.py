@@ -1,4 +1,4 @@
-from benchpilot.config import COMPONENTS, RunConfig, StressConfig
+from benchpress.config import COMPONENTS, RunConfig, StressConfig
 
 
 def test_runconfig_defaults():
@@ -27,4 +27,4 @@ def test_gpu_budget_explicit_overrides_quick():
 
 def test_db_path_derives_from_data_dir(tmp_path):
     cfg = RunConfig(data_dir=tmp_path)
-    assert cfg.db_path == tmp_path / "benchpilot.db"
+    assert cfg.db_path == tmp_path / "benchpress.db"

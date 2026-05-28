@@ -1,10 +1,10 @@
-from benchpilot.benchmarks.cpu import SysbenchCpu
-from benchpilot.benchmarks.gpu.tensor import MatmulSuite
-from benchpilot.benchmarks.ram import MbwBench, StreamBench, SysbenchMemory
-from benchpilot.benchmarks.registry import build_benchmark_plan, build_stress_plan
-from benchpilot.benchmarks.ssd import FioRandRead, FioRandWrite, FioSeqRead, FioSeqWrite
-from benchpilot.benchmarks.stress import CpuStress, GpuStress, RamStress, SsdStress
-from benchpilot.config import RunConfig, StressConfig
+from benchpress.benchmarks.cpu import SysbenchCpu
+from benchpress.benchmarks.gpu.tensor import MatmulSuite
+from benchpress.benchmarks.ram import MbwBench, StreamBench, SysbenchMemory
+from benchpress.benchmarks.registry import build_benchmark_plan, build_stress_plan
+from benchpress.benchmarks.ssd import FioRandRead, FioRandWrite, FioSeqRead, FioSeqWrite
+from benchpress.benchmarks.stress import CpuStress, GpuStress, RamStress, SsdStress
+from benchpress.config import RunConfig, StressConfig
 
 
 def _names(plan):

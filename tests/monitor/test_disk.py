@@ -2,14 +2,14 @@ import json
 
 import pytest
 
-from benchpilot.monitor.disk import DiskProbe
+from benchpress.monitor.disk import DiskProbe
 
 
 @pytest.fixture
 def patched_disk_probe(monkeypatch, mock_check_output):
     """Force DiskProbe to discover a fixed set of NVMe devices and route smartctl
     output through mock_check_output."""
-    from benchpilot.monitor import disk as disk_mod
+    from benchpress.monitor import disk as disk_mod
 
     def fake_devices(_self=None):
         return None  # we'll set after construction

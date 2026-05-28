@@ -6,7 +6,7 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from benchpilot.storage import Storage
+from benchpress.storage import Storage
 
 TEMPLATE_DIR = Path(__file__).parent / "templates"
 
@@ -78,7 +78,7 @@ def generate_report(*, db_path: Path, out_dir: Path, only_run_ids: list[int] | N
         run_count=len(data["runs"]),
     )
     ts = time.strftime("%Y%m%d-%H%M%S")
-    out = out_dir / f"benchpilot-report-{ts}.html"
+    out = out_dir / f"benchpress-report-{ts}.html"
     out.write_text(html)
     # Also write a stable "latest.html" symlink-like copy
     (out_dir / "latest.html").write_text(html)

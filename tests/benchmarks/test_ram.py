@@ -1,4 +1,4 @@
-from benchpilot.benchmarks.ram import MbwBench, StreamBench, SysbenchMemory
+from benchpress.benchmarks.ram import MbwBench, StreamBench, SysbenchMemory
 
 
 MBW_OUTPUT = """\

@@ -4,8 +4,8 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from benchpilot.benchmarks._shell import require, run
-from benchpilot.benchmarks.base import BenchmarkResult
+from benchpress.benchmarks._shell import require, run
+from benchpress.benchmarks.base import BenchmarkResult
 
 
 _JOB_FILES = "fio.bench.tmp"
@@ -56,7 +56,7 @@ def _extract(job: dict, side: str) -> dict:
 class FioSeqRead:
     name: str = "ssd.fio.seq_read"
     component: str = "ssd"
-    target_dir: Path = Path.home() / ".benchpilot_fio"
+    target_dir: Path = Path.home() / ".benchpress_fio"
     runtime: int = 10
     size: str = "2G"
     bs: str = "1M"
@@ -76,7 +76,7 @@ class FioSeqRead:
 class FioSeqWrite:
     name: str = "ssd.fio.seq_write"
     component: str = "ssd"
-    target_dir: Path = Path.home() / ".benchpilot_fio"
+    target_dir: Path = Path.home() / ".benchpress_fio"
     runtime: int = 10
     size: str = "2G"
     bs: str = "1M"
@@ -96,7 +96,7 @@ class FioSeqWrite:
 class FioRandRead:
     name: str = "ssd.fio.rand_read"
     component: str = "ssd"
-    target_dir: Path = Path.home() / ".benchpilot_fio"
+    target_dir: Path = Path.home() / ".benchpress_fio"
     runtime: int = 15
     size: str = "1G"
     bs: str = "4k"
@@ -116,7 +116,7 @@ class FioRandRead:
 class FioRandWrite:
     name: str = "ssd.fio.rand_write"
     component: str = "ssd"
-    target_dir: Path = Path.home() / ".benchpilot_fio"
+    target_dir: Path = Path.home() / ".benchpress_fio"
     runtime: int = 15
     size: str = "1G"
     bs: str = "4k"

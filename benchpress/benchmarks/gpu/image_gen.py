@@ -3,8 +3,8 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 
-from benchpilot.benchmarks.base import BenchmarkResult
-from benchpilot.benchmarks.gpu._torch import cuda_or_skip
+from benchpress.benchmarks.base import BenchmarkResult
+from benchpress.benchmarks.gpu._torch import cuda_or_skip
 
 
 @dataclass
