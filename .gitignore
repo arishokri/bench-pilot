@@ -4,6 +4,9 @@ __pycache__/
 .benchpilot/
 data/
 reports/
+fio_scratch/
+hf_cache/
+uv_cache/
 *.db
 *.db-journal
 *.log

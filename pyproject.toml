@@ -36,6 +36,10 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["benchpilot"]
 
+# uv: keep all package downloads + wheel cache inside the project tree.
+[tool.uv]
+cache-dir = "./uv_cache"
+
 # uv: pull CUDA-enabled torch wheels for Blackwell (RTX 50-series) from the cu126 index.
 [[tool.uv.index]]
 name = "pytorch-cu126"

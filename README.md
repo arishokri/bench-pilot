@@ -36,6 +36,16 @@ uv run benchpilot report --open
 
 Data lives in `./data/benchpilot.db` (SQLite). The report is a single self-contained HTML file in `./reports/`.
 
+All scratch and downloaded artefacts are kept inside the project:
+- `./fio_scratch/` — fio + stress-ng working files (deleted after each run)
+- `./hf_cache/` — HuggingFace model downloads (BERT / ViT / SDXL-Turbo), reused across runs
+- `./uv_cache/` — uv's wheel + source download cache (configured via `[tool.uv].cache-dir` in `pyproject.toml`)
+- `./.venv/` — uv-managed Python venv
+- `./data/` — SQLite database
+- `./reports/` — generated HTML dashboards
+
+`HF_HOME` is set automatically at run time to `./hf_cache/`. Override either dir with `--ssd-dir` or `--hf-cache-dir`. Ollama keeps its system default (`~/.ollama/`).
+
 ## Layout
 
 ```

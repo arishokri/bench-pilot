@@ -46,7 +46,8 @@ def cmd_run(
     quick: bool = typer.Option(True, "--quick/--full", help="Quick run (~3 min) vs full sweep."),
     label: Optional[str] = typer.Option(None, "--label", "-l", help="Human label saved with the run."),
     data_dir: Path = typer.Option(Path("./data"), "--data-dir"),
-    ssd_dir: Optional[Path] = typer.Option(None, "--ssd-dir", help="Where fio creates its scratch file (defaults to ~/.benchpilot_fio)."),
+    ssd_dir: Optional[Path] = typer.Option(None, "--ssd-dir", help="Where fio creates its scratch file (defaults to ./fio_scratch)."),
+    hf_cache_dir: Optional[Path] = typer.Option(None, "--hf-cache-dir", help="HuggingFace download cache (defaults to ./hf_cache). Sets HF_HOME for the run."),
     no_image_gen: bool = typer.Option(False, "--no-image-gen", help="Skip the SD-turbo test."),
     ollama_models: Optional[str] = typer.Option(None, "--ollama-models", help="Comma list of ollama model tags to bench (e.g. 'qwen3.5:2b,gemma4:e2b'). Default: auto-pick smallest 2."),
     sample_interval: float = typer.Option(1.0, "--sample-interval", help="Sensor sampling interval seconds."),
@@ -63,6 +64,8 @@ def cmd_run(
     )
     if ssd_dir is not None:
         cfg.ssd_target_dir = ssd_dir
+    if hf_cache_dir is not None:
+        cfg.hf_cache_dir = hf_cache_dir
     run_benchmarks(cfg, console=console)
 
 
@@ -73,6 +76,7 @@ def cmd_stress(
     label: Optional[str] = typer.Option(None, "--label", "-l"),
     data_dir: Path = typer.Option(Path("./data"), "--data-dir"),
     ssd_dir: Optional[Path] = typer.Option(None, "--ssd-dir"),
+    hf_cache_dir: Optional[Path] = typer.Option(None, "--hf-cache-dir"),
     sample_interval: float = typer.Option(1.0, "--sample-interval"),
 ) -> None:
     """Time-based stress test for thermal characterisation."""
@@ -85,6 +89,8 @@ def cmd_stress(
     )
     if ssd_dir is not None:
         cfg.ssd_target_dir = ssd_dir
+    if hf_cache_dir is not None:
+        cfg.hf_cache_dir = hf_cache_dir
     run_stress(cfg, console=console)
 
 

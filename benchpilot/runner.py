@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import os
 import platform
 import socket
 import subprocess
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Iterable
 
 from rich.console import Console
@@ -69,6 +71,22 @@ class RunSummary:
     benchmarks_skipped: int
 
 
+def _prepare_scratch_dirs(*, fio_dir: Path, hf_dir: Path) -> None:
+    """Create local scratch dirs and steer HuggingFace + fio at them.
+
+    Done before any benchmark .run() so transformers/diffusers pick up HF_HOME
+    on their first import inside a benchmark.
+    """
+    fio_dir.mkdir(parents=True, exist_ok=True)
+    hf_dir.mkdir(parents=True, exist_ok=True)
+    hf_abs = str(hf_dir.resolve())
+    os.environ["HF_HOME"] = hf_abs
+    # Belt-and-braces: some libs still consult the legacy names.
+    os.environ.setdefault("HF_HUB_CACHE", str((hf_dir / "hub").resolve()))
+    os.environ.setdefault("TRANSFORMERS_CACHE", hf_abs)
+    os.environ.setdefault("DIFFUSERS_CACHE", hf_abs)
+
+
 def _execute(plan: Iterable[Benchmark], *, storage: Storage, run_id: int, console: Console) -> RunSummary:
     ok = failed = skipped = 0
     with Progress(
@@ -108,6 +126,7 @@ def _execute(plan: Iterable[Benchmark], *, storage: Storage, run_id: int, consol
 
 def run_benchmarks(cfg: RunConfig, console: Console | None = None) -> RunSummary:
     console = console or Console()
+    _prepare_scratch_dirs(fio_dir=cfg.ssd_target_dir, hf_dir=cfg.hf_cache_dir)
     storage = Storage(cfg.db_path)
     sysinfo = _system_info()
     label = cfg.label or ("quick" if cfg.quick else "full")
@@ -132,6 +151,7 @@ def run_benchmarks(cfg: RunConfig, console: Console | None = None) -> RunSummary
 
 def run_stress(cfg: StressConfig, console: Console | None = None) -> RunSummary:
     console = console or Console()
+    _prepare_scratch_dirs(fio_dir=cfg.ssd_target_dir, hf_dir=cfg.hf_cache_dir)
     storage = Storage(cfg.db_path)
     sysinfo = _system_info()
     label = cfg.label or f"stress-{cfg.duration_seconds}s"
