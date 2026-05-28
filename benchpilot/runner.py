@@ -22,9 +22,20 @@ from rich.table import Table
 from benchpilot.benchmarks import Benchmark
 from benchpilot.benchmarks.registry import build_benchmark_plan, build_stress_plan
 from benchpilot.benchmarks.ssd import cleanup_fio_files
-from benchpilot.config import RunConfig, StressConfig
+from benchpilot.config import COMPONENTS, RunConfig, StressConfig
 from benchpilot.monitor import Sampler
 from benchpilot.storage import Storage
+
+
+def _components_suffix(components: tuple[str, ...]) -> str:
+    """Render the component selection as a label suffix.
+
+    All four components → 'all'. Subsets are joined with '_' in the canonical
+    COMPONENTS order so labels are stable regardless of CLI input order.
+    """
+    if set(components) == set(COMPONENTS):
+        return "all"
+    return "_".join(c for c in COMPONENTS if c in components)
 
 
 def _system_info() -> dict:
@@ -152,7 +163,7 @@ def run_benchmarks(cfg: RunConfig, console: Console | None = None) -> RunSummary
     _prepare_scratch_dirs(fio_dir=cfg.ssd_target_dir, hf_dir=cfg.hf_cache_dir)
     storage = Storage(cfg.db_path)
     sysinfo = _system_info()
-    label = cfg.label or ("quick" if cfg.quick else "full")
+    label = cfg.label or f"{'quick' if cfg.quick else 'full'}-{_components_suffix(cfg.components)}"
     run_id = storage.start_run(mode="bench", label=label, hostname=socket.gethostname(), system_info=sysinfo)
     sampler = Sampler(storage, run_id, interval=cfg.sample_interval)
     sampler.start()
@@ -177,7 +188,7 @@ def run_stress(cfg: StressConfig, console: Console | None = None) -> RunSummary:
     _prepare_scratch_dirs(fio_dir=cfg.ssd_target_dir)
     storage = Storage(cfg.db_path)
     sysinfo = _system_info()
-    label = cfg.label or f"stress-{cfg.duration_seconds}s"
+    label = cfg.label or f"stress-{_components_suffix(cfg.components)}"
     run_id = storage.start_run(mode="stress", label=label, hostname=socket.gethostname(), system_info=sysinfo)
     sampler = Sampler(storage, run_id, interval=cfg.sample_interval)
     sampler.start()
