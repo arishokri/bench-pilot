@@ -1,8 +1,8 @@
 import json
 import re
 
-from benchpilot.report.generator import generate_report
-from benchpilot.storage import Storage
+from benchpress.report.generator import generate_report
+from benchpress.storage import Storage
 
 
 def _seed_run(db: Storage, *, label: str) -> int:

@@ -21,12 +21,12 @@ from rich.progress import (
 )
 from rich.table import Table
 
-from benchpilot.benchmarks import Benchmark
-from benchpilot.benchmarks.registry import build_benchmark_plan, build_stress_plan
-from benchpilot.benchmarks.ssd import cleanup_fio_files
-from benchpilot.config import COMPONENTS, RunConfig, StressConfig
-from benchpilot.monitor import Sampler
-from benchpilot.storage import Storage
+from benchpress.benchmarks import Benchmark
+from benchpress.benchmarks.registry import build_benchmark_plan, build_stress_plan
+from benchpress.benchmarks.ssd import cleanup_fio_files
+from benchpress.config import COMPONENTS, RunConfig, StressConfig
+from benchpress.monitor import Sampler
+from benchpress.storage import Storage
 
 
 def _components_suffix(components: tuple[str, ...]) -> str:

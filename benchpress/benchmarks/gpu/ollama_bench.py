@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 
 import httpx
 
-from benchpilot.benchmarks.base import BenchmarkResult
+from benchpress.benchmarks.base import BenchmarkResult
 
 
 _DEFAULT_HOST = "http://127.0.0.1:11434"

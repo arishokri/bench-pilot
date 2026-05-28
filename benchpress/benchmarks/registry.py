@@ -2,19 +2,19 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from benchpilot.benchmarks.base import Benchmark
-from benchpilot.benchmarks.cpu import SysbenchCpu
-from benchpilot.benchmarks.gpu.cnn import ResNet50Bench
-from benchpilot.benchmarks.gpu.hf_inference import BertInference, VitInference
-from benchpilot.benchmarks.gpu.image_gen import StableDiffusionInference
-from benchpilot.benchmarks.gpu.ollama_bench import OllamaInference
-from benchpilot.benchmarks.gpu.tensor import Conv2dSuite, MatmulSuite
-from benchpilot.benchmarks.gpu.transformer import TinyGPTTrain
-from benchpilot.benchmarks.gpu.vram_stress import VramStress
-from benchpilot.benchmarks.ram import MbwBench, StreamBench, SysbenchMemory
-from benchpilot.benchmarks.ssd import FioRandRead, FioRandWrite, FioSeqRead, FioSeqWrite
-from benchpilot.benchmarks.stress import CpuStress, GpuStress, RamStress, SsdStress
-from benchpilot.config import RunConfig, StressConfig
+from benchpress.benchmarks.base import Benchmark
+from benchpress.benchmarks.cpu import SysbenchCpu
+from benchpress.benchmarks.gpu.cnn import ResNet50Bench
+from benchpress.benchmarks.gpu.hf_inference import BertInference, VitInference
+from benchpress.benchmarks.gpu.image_gen import StableDiffusionInference
+from benchpress.benchmarks.gpu.ollama_bench import OllamaInference
+from benchpress.benchmarks.gpu.tensor import Conv2dSuite, MatmulSuite
+from benchpress.benchmarks.gpu.transformer import TinyGPTTrain
+from benchpress.benchmarks.gpu.vram_stress import VramStress
+from benchpress.benchmarks.ram import MbwBench, StreamBench, SysbenchMemory
+from benchpress.benchmarks.ssd import FioRandRead, FioRandWrite, FioSeqRead, FioSeqWrite
+from benchpress.benchmarks.stress import CpuStress, GpuStress, RamStress, SsdStress
+from benchpress.config import RunConfig, StressConfig
 
 
 def build_benchmark_plan(cfg: RunConfig) -> list[Benchmark]:

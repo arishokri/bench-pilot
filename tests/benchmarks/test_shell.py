@@ -1,6 +1,6 @@
 import pytest
 
-from benchpilot.benchmarks._shell import ShellResult, ToolMissing, require, run
+from benchpress.benchmarks._shell import ShellResult, ToolMissing, require, run
 
 
 def test_require_returns_path_when_present(monkeypatch):

@@ -1,3 +1,3 @@
-from benchpilot.report.generator import generate_report
+from benchpress.report.generator import generate_report
 
 __all__ = ["generate_report"]

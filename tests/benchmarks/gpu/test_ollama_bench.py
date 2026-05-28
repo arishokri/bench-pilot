@@ -1,4 +1,4 @@
-from benchpilot.benchmarks.gpu.ollama_bench import (
+from benchpress.benchmarks.gpu.ollama_bench import (
     OllamaInference,
     _bench_one,
     _pick_small,

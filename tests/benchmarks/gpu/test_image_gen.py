@@ -12,7 +12,7 @@ from tests.conftest import requires_gpu
 @requires_gpu
 @pytest.mark.gpu
 def test_sdxl_turbo_produces_image():
-    from benchpilot.benchmarks.gpu.image_gen import StableDiffusionInference
+    from benchpress.benchmarks.gpu.image_gen import StableDiffusionInference
 
     r = StableDiffusionInference(
         num_images=1, height=512, width=512, steps=1, guidance=0.0,

@@ -1,4 +1,4 @@
-from benchpilot.monitor.nvidia import NvidiaProbe, _to_float
+from benchpress.monitor.nvidia import NvidiaProbe, _to_float
 
 
 def test_to_float_handles_na_sentinels():

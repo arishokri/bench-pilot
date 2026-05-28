@@ -4,8 +4,8 @@ import os
 import re
 from dataclasses import dataclass
 
-from benchpilot.benchmarks._shell import require, run
-from benchpilot.benchmarks.base import BenchmarkResult
+from benchpress.benchmarks._shell import require, run
+from benchpress.benchmarks.base import BenchmarkResult
 
 
 def _parse_sysbench_cpu(stdout: str) -> dict:

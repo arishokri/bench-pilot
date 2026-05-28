@@ -1,6 +1,6 @@
 import pytest
 
-from benchpilot.monitor.hwmon import HwmonProbe
+from benchpress.monitor.hwmon import HwmonProbe
 
 
 def test_temp_scales_milli_to_celsius(fake_hwmon):
@@ -79,6 +79,6 @@ def test_discovery_skips_unknown_kinds(fake_hwmon):
 
 
 def test_no_hwmon_returns_empty(tmp_path, monkeypatch):
-    from benchpilot.monitor import hwmon as hwmod
+    from benchpress.monitor import hwmon as hwmod
     monkeypatch.setattr(hwmod, "_HWMON", tmp_path / "does-not-exist")
     assert HwmonProbe().sample(ts=1.0) == []

@@ -1,7 +1,7 @@
 import threading
 import time
 
-from benchpilot.monitor.sampler import Sampler
+from benchpress.monitor.sampler import Sampler
 
 
 class _StubProbe:
@@ -67,5 +67,5 @@ def test_sampler_thread_dies_cleanly(temp_db):
     s.start()
     s.stop()
     # No daemon thread should still be running
-    alive = [t for t in threading.enumerate() if t.name == "benchpilot-sampler"]
+    alive = [t for t in threading.enumerate() if t.name == "benchpress-sampler"]
     assert alive == []

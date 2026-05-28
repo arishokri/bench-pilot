@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install the Linux benchmark tools benchpilot shells out to.
+# Install the Linux benchmark tools benchpress shells out to.
 # Arch-family one-liner. Edit if you're on Debian/Fedora.
 set -euo pipefail
 
@@ -27,4 +27,4 @@ fi
 
 echo
 echo "OK. Next:  uv sync --extra gpu"
-echo "Then:     uv run benchpilot run --quick"
+echo "Then:     uv run benchpress run --quick"

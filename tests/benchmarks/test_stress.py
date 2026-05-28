@@ -1,4 +1,4 @@
-from benchpilot.benchmarks.stress import CpuStress, GpuStress, RamStress, SsdStress
+from benchpress.benchmarks.stress import CpuStress, GpuStress, RamStress, SsdStress
 
 
 def test_cpu_stress_cmdline(mock_shell):

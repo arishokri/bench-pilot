@@ -1,6 +1,6 @@
 import json
 
-from benchpilot.benchmarks.ssd import (
+from benchpress.benchmarks.ssd import (
     FioRandRead,
     FioSeqRead,
     FioSeqWrite,
