@@ -21,8 +21,8 @@ class RunConfig:
     sample_interval: float = 1.0  # seconds between sensor samples
     # SSD benchmarks need a writable directory on the device under test.
     ssd_target_dir: Path = field(default_factory=lambda: Path.home() / ".benchpilot_fio")
-    # Optional caps for GPU/ML benchmarks to fit the 3-min target.
-    gpu_quick_seconds_per_test: float = 8.0
+    # Per-test GPU compute budget. None = derive from `quick` (8s quick / 20s full).
+    gpu_seconds_per_test: float | None = None
     # Whether to attempt the heavy SD/SDXL test (requires model download).
     include_image_gen: bool = True
     # Ollama models to probe (must already be `ollama pull`-ed).
@@ -31,6 +31,12 @@ class RunConfig:
     @property
     def db_path(self) -> Path:
         return self.data_dir / DEFAULT_DB_NAME
+
+    @property
+    def gpu_budget(self) -> float:
+        if self.gpu_seconds_per_test is not None:
+            return self.gpu_seconds_per_test
+        return 8.0 if self.quick else 20.0
 
 
 @dataclass
