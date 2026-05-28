@@ -16,7 +16,7 @@ class TinyGPTTrain:
 
     name: str = "gpu.transformer.train"
     component: str = "gpu"
-    batch: int = 16
+    batch: int = 8
     seq_len: int = 1024
     d_model: int = 768
     n_head: int = 12
@@ -81,12 +81,16 @@ class TinyGPTTrain:
         opt = torch.optim.AdamW(model.parameters(), lr=3e-4)
         idx = torch.randint(0, self.vocab, (self.batch, self.seq_len), device="cuda")
         tgt = torch.randint(0, self.vocab, (self.batch, self.seq_len), device="cuda")
-        mask = torch.triu(torch.full((self.seq_len, self.seq_len), float("-inf"), device="cuda"), diagonal=1)
+        # Mask must match the model dtype; recent PyTorch attention impls reject mixed dtypes.
+        mask = torch.triu(
+            torch.full((self.seq_len, self.seq_len), float("-inf"), device="cuda", dtype=dtype),
+            diagonal=1,
+        )
         loss_fn = torch.nn.CrossEntropyLoss()
 
         for _ in range(2):  # warmup
             out = model(idx, mask)
-            loss = loss_fn(out.float().reshape(-1, self.vocab), tgt.reshape(-1))
+            loss = loss_fn(out.reshape(-1, self.vocab), tgt.reshape(-1))
             loss.backward()
             opt.step()
             opt.zero_grad(set_to_none=True)
@@ -96,7 +100,7 @@ class TinyGPTTrain:
         steps = 0
         while (time.monotonic() - start) < self.seconds:
             out = model(idx, mask)
-            loss = loss_fn(out.float().reshape(-1, self.vocab), tgt.reshape(-1))
+            loss = loss_fn(out.reshape(-1, self.vocab), tgt.reshape(-1))
             loss.backward()
             opt.step()
             opt.zero_grad(set_to_none=True)

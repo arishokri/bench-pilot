@@ -53,12 +53,14 @@ def build_benchmark_plan(cfg: RunConfig) -> list[Benchmark]:
         plan.append(TinyGPTTrain(seconds=s))
         plan.append(BertInference(seconds=hf_s))
         plan.append(VitInference(seconds=hf_s))
+        # SDXL before Ollama: SDXL needs ~8 GiB contiguous and Ollama's unload is async,
+        # so we run the most VRAM-hungry test while the device is freshest.
+        if cfg.include_image_gen:
+            plan.append(StableDiffusionInference(num_images=sd_images, steps=sd_steps))
         if cfg.ollama_models:
             plan.append(OllamaInference(models=cfg.ollama_models, num_predict=ollama_tokens))
         else:
             plan.append(OllamaInference(num_predict=ollama_tokens))
-        if cfg.include_image_gen:
-            plan.append(StableDiffusionInference(num_images=sd_images, steps=sd_steps))
         plan.append(VramStress(target_fraction=0.7, op_seconds=vram_s))
 
     return plan

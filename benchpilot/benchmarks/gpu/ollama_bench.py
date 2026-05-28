@@ -26,6 +26,9 @@ def _bench_one(host: str, model: str, prompt: str, num_predict: int) -> dict:
         "model": model,
         "prompt": prompt,
         "stream": False,
+        # keep_alive: 0 makes Ollama unload the model right after the response,
+        # so subsequent GPU tests (notably SDXL) have full VRAM available.
+        "keep_alive": 0,
         "options": {"num_predict": num_predict, "temperature": 0.0},
     }
     start = time.monotonic()

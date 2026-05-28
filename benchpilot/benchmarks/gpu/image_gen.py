@@ -38,7 +38,14 @@ class StableDiffusionInference:
         except ImportError:
             return BenchmarkResult(results={"skipped": "diffusers not installed"})
 
+        # Silence diffusers' own internal deprecation warning about `upcast_vae`.
+        # The pipeline still uses it on SDXL VAE (force_upcast=True) until they
+        # finish the 1.0 migration; doing the cast ourselves doesn't work because
+        # the pipeline also converts latents inside the same code branch.
+        import warnings
+        warnings.filterwarnings("ignore", message=".*upcast_vae.*", category=FutureWarning)
         pipe = AutoPipelineForText2Image.from_pretrained(
+            # diffusers 0.37 still uses `torch_dtype=`; transformers 5.x switched to `dtype=`.
             self.model_id, torch_dtype=torch.float16, variant="fp16"
         ).to("cuda")
         pipe.set_progress_bar_config(disable=True)

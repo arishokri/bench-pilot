@@ -29,7 +29,7 @@ class BertInference:
 
         model_id = "bert-base-uncased"
         tok = AutoTokenizer.from_pretrained(model_id)
-        model = AutoModel.from_pretrained(model_id, torch_dtype=torch.float16).to("cuda").eval()
+        model = AutoModel.from_pretrained(model_id, dtype=torch.float16).to("cuda").eval()
         prompt = "the quick brown fox jumps over the lazy dog " * (self.seq_len // 10)
         enc = tok([prompt] * self.batch, padding="max_length", truncation=True,
                   max_length=self.seq_len, return_tensors="pt").to("cuda")
@@ -74,7 +74,7 @@ class VitInference:
             return BenchmarkResult(results={"skipped": "transformers not installed"})
 
         model_id = "google/vit-base-patch16-224"
-        model = ViTModel.from_pretrained(model_id, torch_dtype=torch.float16).to("cuda").eval()
+        model = ViTModel.from_pretrained(model_id, dtype=torch.float16).to("cuda").eval()
         x = torch.randn(self.batch, 3, 224, 224, device="cuda", dtype=torch.float16)
         with torch.inference_mode():
             for _ in range(3):

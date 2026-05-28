@@ -85,6 +85,23 @@ def _prepare_scratch_dirs(*, fio_dir: Path, hf_dir: Path) -> None:
     os.environ.setdefault("HF_HUB_CACHE", str((hf_dir / "hub").resolve()))
     os.environ.setdefault("TRANSFORMERS_CACHE", hf_abs)
     os.environ.setdefault("DIFFUSERS_CACHE", hf_abs)
+    # Reduce CUDA allocator fragmentation across back-to-back GPU benchmarks.
+    os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+
+
+def _gpu_cleanup() -> None:
+    """Run between GPU benchmarks to reclaim VRAM that each test's `del` + `empty_cache`
+    couldn't free on its own (cudnn workspace, autograd graph leftovers, ref cycles)."""
+    import gc
+    gc.collect()
+    try:
+        import torch  # type: ignore
+    except ImportError:
+        return
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
+        torch.cuda.empty_cache()
+        torch.cuda.reset_peak_memory_stats()
 
 
 def _execute(plan: Iterable[Benchmark], *, storage: Storage, run_id: int, console: Console) -> RunSummary:
@@ -111,6 +128,8 @@ def _execute(plan: Iterable[Benchmark], *, storage: Storage, run_id: int, consol
                 storage.finish_benchmark(bench_id, status="error", error=str(e))
                 failed += 1
                 progress.update(task, advance=1, status=f"[red]✗ {e}")
+                if bench.component == "gpu":
+                    _gpu_cleanup()
                 continue
             res = result.results
             if isinstance(res, dict) and res.get("skipped"):
@@ -121,6 +140,8 @@ def _execute(plan: Iterable[Benchmark], *, storage: Storage, run_id: int, consol
                 storage.finish_benchmark(bench_id, status="ok", results=res)
                 ok += 1
                 progress.update(task, advance=1, status="[green]✓")
+            if bench.component == "gpu":
+                _gpu_cleanup()
     return RunSummary(run_id=run_id, benchmarks_ok=ok, benchmarks_failed=failed, benchmarks_skipped=skipped)
 
 
