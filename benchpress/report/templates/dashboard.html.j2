@@ -21,6 +21,13 @@
   main { padding: 16px 24px; overflow-y: auto; }
   h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 16px 0 8px; }
   h2:first-child { margin-top: 0; }
+  #runs-details > summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 8px; }
+  #runs-details > summary::-webkit-details-marker { display: none; }
+  #runs-details > summary h2 { display: inline; margin: 0; }
+  #runs-details > summary::before { content: '\25B6'; color: var(--muted); font-size: 10px; transition: transform .1s; }
+  #runs-details[open] > summary::before { transform: rotate(90deg); }
+  #runs-details #runs-list { margin-top: 8px; }
+  #runs-summary { font-size: 12px; }
   .run-item { padding: 8px; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 6px;
               cursor: pointer; transition: background .1s; }
   .run-item:hover { background: #1c232c; }
@@ -61,8 +68,10 @@
 </header>
 <div class="layout">
   <aside>
-    <h2>Runs</h2>
-    <div id="runs-list"></div>
+    <details id="runs-details" open>
+      <summary><h2>Runs</h2><span id="runs-summary" class="run-meta"></span></summary>
+      <div id="runs-list"></div>
+    </details>
     <div class="filter-section">
       <h2>Components</h2>
       <div id="component-filter" class="checkbox-list"></div>
@@ -129,6 +138,11 @@ const enabledSources = new Set();
 // ---------- sidebar ----------
 function renderRuns() {
   const el = document.getElementById('runs-list');
+  const summary = document.getElementById('runs-summary');
+  const sel = DATA.runs.find(r => r.id === selectedRunId);
+  summary.textContent = sel
+    ? `#${sel.id} ${sel.label || ''} [${sel.mode}]`
+    : `${DATA.runs.length} run(s)`;
   if (!DATA.runs.length) { el.innerHTML = '<div class="empty">No runs yet.</div>'; return; }
   el.innerHTML = DATA.runs.map(r => `
     <div class="run-item ${r.id === selectedRunId ? 'active' : ''}" data-id="${r.id}">
@@ -213,6 +227,8 @@ function selectRun(id) {
   selectedRunId = id;
   // reset source set so it re-populates from the new run
   enabledSources.clear();
+  // collapse the runs menu once a run is picked; the summary shows the active run
+  document.getElementById('runs-details').removeAttribute('open');
   renderRuns();
   renderMetricFilter();
   renderSourceFilter();
@@ -245,7 +261,15 @@ function renderMain() {
     sectionsHtml.push('<div class="empty">No metrics selected.</div>');
   }
   for (const metric of metricsToPlot) {
-    sectionsHtml.push(`<div class="chart"><div class="chart-title">${(METRIC_CHARTS[metric]||{}).title || metric}</div><div id="chart-${metric}" style="height: 280px;"></div></div>`);
+    sectionsHtml.push(`<div class="chart">
+      <div class="chart-title" style="display:flex; align-items:center; justify-content:space-between">
+        <span>${(METRIC_CHARTS[metric]||{}).title || metric}</span>
+        <span>
+          <button class="secondary" data-chart="${metric}" data-act="none">Hide all</button>
+          <button class="secondary" data-chart="${metric}" data-act="all">Show all</button>
+        </span>
+      </div>
+      <div id="chart-${metric}" style="height: 280px;"></div></div>`);
   }
 
   // Benchmarks table
@@ -258,6 +282,18 @@ function renderMain() {
   for (const metric of metricsToPlot) {
     drawMetricChart(metric, run, benchSpans);
   }
+
+  // Wire per-chart "Hide all / Show all" legend controls. 'legendonly' keeps the
+  // entries listed so the user can click the few series they care about back on.
+  main.querySelectorAll('button[data-chart]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const div = document.getElementById('chart-' + btn.dataset.chart);
+      if (!div || !div.data) return;
+      const indices = div.data.map((_, i) => i);
+      const visible = btn.dataset.act === 'all' ? true : 'legendonly';
+      Plotly.restyle(div, {visible}, indices);
+    });
+  });
 }
 
 function renderSystemInfo(run) {
@@ -299,13 +335,13 @@ function drawMetricChart(metric, run, benchSpans) {
   }));
   const annotations = benchSpans.map((b, i) => ({
     x: new Date((b.start.getTime() + b.end.getTime()) / 2),
-    y: 1.02, yref: 'paper', xref: 'x',
+    y: 1.0, yref: 'paper', xref: 'x',
     text: b.name, showarrow: false,
     font: {size: 9, color: '#8b949e'},
-    textangle: -25, yanchor: 'bottom',
+    textangle: 0, xanchor: 'center', yanchor: 'bottom',
   }));
   Plotly.newPlot(`chart-${metric}`, traces, {
-    margin: {l: 50, r: 16, t: 28, b: 36},
+    margin: {l: 50, r: 16, t: 48, b: 36},
     paper_bgcolor: '#161b22', plot_bgcolor: '#0e1116',
     font: {color: '#e6edf3', size: 11},
     xaxis: {gridcolor: '#232a33', zerolinecolor: '#232a33'},
