@@ -202,3 +202,36 @@ def test_execute_concurrent_empty_plan(temp_db):
     summary = _execute_concurrent([], storage=temp_db, run_id=run_id,
                                    console=Console(force_terminal=False))
     assert (summary.benchmarks_ok, summary.benchmarks_failed, summary.benchmarks_skipped) == (0, 0, 0)
+
+
+# ---------- warmup ----------
+def test_warmup_budget_derives_from_quick():
+    assert RunConfig(quick=True).warmup_budget == 60
+    assert RunConfig(quick=False).warmup_budget == 120
+    # explicit override wins
+    assert RunConfig(quick=True, warmup_seconds=90).warmup_budget == 90
+
+
+def test_run_warmup_runs_load_without_recording(temp_db, monkeypatch):
+    """Warmup executes the stress plan but writes no benchmark rows."""
+    from benchpress import runner as runner_mod
+
+    ran = []
+
+    class _FakeStress:
+        def __init__(self, name): self.name = name; self.component = "cpu"
+        def params(self): return {}
+        def run(self, cancel=None):
+            ran.append(self.name)
+            return BenchmarkResult(results={})
+
+    monkeypatch.setattr(runner_mod, "build_stress_plan",
+                        lambda scfg: [_FakeStress("stress.cpu"), _FakeStress("stress.gpu")])
+
+    run_id = temp_db.start_run(mode="bench", label="t", hostname="h", system_info={})
+    cfg = RunConfig(quick=True, warmup_seconds=1)
+    interrupted = runner_mod._run_warmup(cfg, console=Console(force_terminal=False))
+    assert interrupted is False
+    assert sorted(ran) == ["stress.cpu", "stress.gpu"]
+    # the key guarantee: warmup recorded nothing in the benchmarks table
+    assert temp_db.benchmarks_for_run(run_id) == []
