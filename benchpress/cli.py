@@ -173,7 +173,7 @@ def cmd_report(
     out = generate_report(db_path=db, out_dir=report_dir, only_run_ids=run_ids)
     console.print(f"Report written to [bold green]{out}[/]")
     if open_browser:
-        webbrowser.open(out.as_uri())
+        webbrowser.open(out.resolve().as_uri())
 
 
 if __name__ == "__main__":
