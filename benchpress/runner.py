@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import platform
+import signal
 import socket
 import subprocess
 import threading
@@ -82,6 +83,7 @@ class RunSummary:
     benchmarks_ok: int
     benchmarks_failed: int
     benchmarks_skipped: int
+    benchmarks_interrupted: int = 0
 
 
 def _prepare_scratch_dirs(*, fio_dir: Path, hf_dir: Path | None = None) -> None:
@@ -174,21 +176,29 @@ def _execute_concurrent(
         return RunSummary(run_id=run_id, benchmarks_ok=0, benchmarks_failed=0, benchmarks_skipped=0)
 
     # Tallies are touched from worker threads; guard with a lock.
-    counts = {"ok": 0, "failed": 0, "skipped": 0}
+    counts = {"ok": 0, "failed": 0, "skipped": 0, "interrupted": 0}
     counts_lock = threading.Lock()
+    # Cooperative cancellation: set on Ctrl+C so workers (subprocesses + the GPU
+    # Python loop) wind down promptly instead of running out the full duration.
+    cancel = threading.Event()
 
     def run_one(bench: Benchmark) -> tuple[str, str, str | None]:
         bench_id = storage.start_benchmark(
             run_id, name=bench.name, component=bench.component, params=bench.params(),
         )
         try:
-            result = bench.run()
+            result = bench.run(cancel=cancel)
         except Exception as e:  # noqa: BLE001
             storage.finish_benchmark(bench_id, status="error", error=str(e))
             with counts_lock:
                 counts["failed"] += 1
             return ("error", bench.name, str(e))
         res = result.results
+        if cancel.is_set():
+            storage.finish_benchmark(bench_id, status="interrupted", results=res)
+            with counts_lock:
+                counts["interrupted"] += 1
+            return ("interrupted", bench.name, None)
         if isinstance(res, dict) and res.get("skipped"):
             storage.finish_benchmark(bench_id, status="skipped", results=res)
             with counts_lock:
@@ -198,6 +208,33 @@ def _execute_concurrent(
         with counts_lock:
             counts["ok"] += 1
         return ("ok", bench.name, None)
+
+    def apply(fut) -> None:
+        status, name, info = fut.result()
+        if status == "ok":
+            progress.update(bench_tasks[name], status="[green]✓", completed=1, total=1)
+        elif status == "skipped":
+            progress.update(bench_tasks[name], status=f"[yellow]– {info}", completed=1, total=1)
+        elif status == "interrupted":
+            progress.update(bench_tasks[name], status="[yellow]⨯ interrupted", completed=1, total=1)
+        else:
+            progress.update(bench_tasks[name], status=f"[red]✗ {info}", completed=1, total=1)
+
+    # First Ctrl+C requests cooperative cancellation; a second one force-quits.
+    # We install an explicit SIGINT handler rather than relying on KeyboardInterrupt
+    # surfacing inside as_completed() — the main thread is blocked in a lock wait
+    # there, so a handler that just sets the event is far more reliable (PEP 475).
+    interrupts = {"n": 0}
+
+    def _on_sigint(signum, frame):
+        interrupts["n"] += 1
+        if interrupts["n"] >= 2:
+            os._exit(130)
+        cancel.set()
+        console.print(
+            "\n[yellow]⚠ Interrupt — stopping stress run "
+            "(press Ctrl+C again to force quit)…[/]"
+        )
 
     with Progress(
         SpinnerColumn(),
@@ -209,21 +246,30 @@ def _execute_concurrent(
         transient=False,
     ) as progress:
         bench_tasks = {b.name: progress.add_task(b.name, total=None, status="…") for b in items}
-        with ThreadPoolExecutor(max_workers=len(items)) as ex:
+        try:
+            prev_handler = signal.signal(signal.SIGINT, _on_sigint)
+        except ValueError:
+            prev_handler = None  # not on the main thread; fall back to default behaviour
+        ex = ThreadPoolExecutor(max_workers=len(items))
+        try:
             futures = {ex.submit(run_one, b): b for b in items}
             for fut in as_completed(futures):
-                status, name, info = fut.result()
-                if status == "ok":
-                    progress.update(bench_tasks[name], status="[green]✓", completed=1, total=1)
-                elif status == "skipped":
-                    progress.update(bench_tasks[name], status=f"[yellow]– {info}", completed=1, total=1)
-                else:
-                    progress.update(bench_tasks[name], status=f"[red]✗ {info}", completed=1, total=1)
+                apply(fut)
+        except KeyboardInterrupt:
+            # Belt-and-braces if SIGINT still surfaced as an exception.
+            cancel.set()
+            for fut in as_completed(futures):
+                apply(fut)
+        finally:
+            if prev_handler is not None:
+                signal.signal(signal.SIGINT, prev_handler)
+            ex.shutdown(wait=False, cancel_futures=True)
     return RunSummary(
         run_id=run_id,
         benchmarks_ok=counts["ok"],
         benchmarks_failed=counts["failed"],
         benchmarks_skipped=counts["skipped"],
+        benchmarks_interrupted=counts["interrupted"],
     )
 
 
@@ -269,7 +315,12 @@ def run_stress(cfg: StressConfig, console: Console | None = None) -> RunSummary:
         sampler.stop()
         storage.end_run(run_id)
         storage.close()
-    console.print(f"\nStress run [bold cyan]{run_id}[/] finished.")
+    if summary.benchmarks_interrupted:
+        console.print(
+            f"\nStress run [bold cyan]{run_id}[/] [yellow]interrupted[/] — partial data saved."
+        )
+    else:
+        console.print(f"\nStress run [bold cyan]{run_id}[/] finished.")
     return summary
 
 

@@ -59,6 +59,7 @@ class _CapturedShell:
     cmdline: list[str] | None = None
     timeout: float | None = None
     check: bool | None = None
+    cancel: object | None = None
 
 
 @pytest.fixture
@@ -75,10 +76,11 @@ def mock_shell(monkeypatch):
     def set_result(*, stdout: str = "", stderr: str = "", returncode: int = 0) -> None:
         result.update(stdout=stdout, stderr=stderr, returncode=returncode)
 
-    def fake_run(cmd, *, timeout=None, check=True):
+    def fake_run(cmd, *, timeout=None, check=True, cancel=None):
         captured.cmdline = list(cmd)
         captured.timeout = timeout
         captured.check = check
+        captured.cancel = cancel
         return _shell.ShellResult(result["returncode"], result["stdout"], result["stderr"])
 
     # Patch the module attribute *and* every benchmark module that already imported `run` by name.

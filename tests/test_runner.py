@@ -110,7 +110,7 @@ class _MockBench:
     def params(self) -> dict:
         return {"mocked": True}
 
-    def run(self) -> BenchmarkResult:
+    def run(self, cancel=None) -> BenchmarkResult:
         if self._outcome == "raise":
             raise RuntimeError("simulated failure")
         if self._outcome == "skipped":
@@ -157,7 +157,7 @@ def test_execute_concurrent_runs_all_in_parallel(temp_db):
     class _Sleeper:
         def __init__(self, name): self.name = name; self.component = "cpu"
         def params(self): return {}
-        def run(self):
+        def run(self, cancel=None):
             time.sleep(0.1)
             return BenchmarkResult(results={"slept": 0.1})
 

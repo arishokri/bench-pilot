@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -26,7 +27,7 @@ class CpuStress:
     def params(self) -> dict:
         return {"duration_seconds": self.duration_seconds, "threads": self.threads}
 
-    def run(self) -> BenchmarkResult:
+    def run(self, cancel: threading.Event | None = None) -> BenchmarkResult:
         cmd = [
             require("stress-ng"),
             f"--cpu={self.threads}",
@@ -34,7 +35,7 @@ class CpuStress:
             "--metrics-brief",
             "--cpu-method=all",
         ]
-        sh = run(cmd, timeout=self.duration_seconds + 60, check=False)
+        sh = run(cmd, timeout=self.duration_seconds + 60, check=False, cancel=cancel)
         return BenchmarkResult(results={"stderr_tail": sh.stderr[-2000:]})
 
 
@@ -55,7 +56,7 @@ class RamStress:
             "bytes_per_worker": self.bytes_per_worker,
         }
 
-    def run(self) -> BenchmarkResult:
+    def run(self, cancel: threading.Event | None = None) -> BenchmarkResult:
         cmd = [
             require("stress-ng"),
             f"--vm={self.workers}",
@@ -64,7 +65,7 @@ class RamStress:
             f"--timeout={self.duration_seconds}s",
             "--metrics-brief",
         ]
-        sh = run(cmd, timeout=self.duration_seconds + 60, check=False)
+        sh = run(cmd, timeout=self.duration_seconds + 60, check=False, cancel=cancel)
         return BenchmarkResult(results={"stderr_tail": sh.stderr[-2000:]})
 
 
@@ -85,7 +86,7 @@ class SsdStress:
             "target_dir": str(self.target_dir),
         }
 
-    def run(self) -> BenchmarkResult:
+    def run(self, cancel: threading.Event | None = None) -> BenchmarkResult:
         self.target_dir.mkdir(parents=True, exist_ok=True)
         cmd = [
             require("stress-ng"),
@@ -95,7 +96,7 @@ class SsdStress:
             f"--timeout={self.duration_seconds}s",
             "--metrics-brief",
         ]
-        sh = run(cmd, timeout=self.duration_seconds + 60, check=False)
+        sh = run(cmd, timeout=self.duration_seconds + 60, check=False, cancel=cancel)
         # stress-ng leaves scratch behind on cancel — clean up
         for p in self.target_dir.glob("stress-ng-*"):
             try:
@@ -125,7 +126,7 @@ class GpuStress:
             "dtype": self.dtype,
         }
 
-    def run(self) -> BenchmarkResult:
+    def run(self, cancel: threading.Event | None = None) -> BenchmarkResult:
         import time
         try:
             import torch  # type: ignore
@@ -142,7 +143,7 @@ class GpuStress:
         # Synchronise each iteration so the queue stays bounded — otherwise dispatch
         # vastly outpaces execution and `duration_seconds` overshoots while the
         # final synchronize drains the backlog (important for concurrent stress mode).
-        while (time.monotonic() - start) < self.duration_seconds:
+        while not (cancel and cancel.is_set()) and (time.monotonic() - start) < self.duration_seconds:
             c = a @ b
             torch.cuda.synchronize()
             iters += 1
