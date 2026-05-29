@@ -122,7 +122,7 @@ def _gpu_cleanup() -> None:
 
 
 def _execute(plan: Iterable[Benchmark], *, storage: Storage, run_id: int, console: Console) -> RunSummary:
-    ok = failed = skipped = 0
+    ok = failed = skipped = interrupted = 0
     with Progress(
         SpinnerColumn(),
         TextColumn("[bold blue]{task.description}"),
@@ -134,32 +134,50 @@ def _execute(plan: Iterable[Benchmark], *, storage: Storage, run_id: int, consol
     ) as progress:
         items = list(plan)
         task = progress.add_task("running", total=len(items), status="")
-        for bench in items:
-            progress.update(task, description=f"[bold blue]{bench.name}", status="…")
-            bench_id = storage.start_benchmark(
-                run_id, name=bench.name, component=bench.component, params=bench.params(),
-            )
-            try:
-                result = bench.run()
-            except Exception as e:  # noqa: BLE001
-                storage.finish_benchmark(bench_id, status="error", error=str(e))
-                failed += 1
-                progress.update(task, advance=1, status=f"[red]✗ {e}")
+        # Track the benchmark whose row is open ("running") so Ctrl+C can finalize
+        # it as "interrupted" instead of leaving a dangling record. KeyboardInterrupt
+        # is a BaseException, so the inner `except Exception` doesn't swallow it.
+        in_flight: tuple[int, Benchmark] | None = None
+        try:
+            for bench in items:
+                progress.update(task, description=f"[bold blue]{bench.name}", status="…")
+                bench_id = storage.start_benchmark(
+                    run_id, name=bench.name, component=bench.component, params=bench.params(),
+                )
+                in_flight = (bench_id, bench)
+                try:
+                    result = bench.run()
+                except Exception as e:  # noqa: BLE001
+                    storage.finish_benchmark(bench_id, status="error", error=str(e))
+                    failed += 1
+                    progress.update(task, advance=1, status=f"[red]✗ {e}")
+                    in_flight = None
+                    if bench.component == "gpu":
+                        _gpu_cleanup()
+                    continue
+                res = result.results
+                if isinstance(res, dict) and res.get("skipped"):
+                    storage.finish_benchmark(bench_id, status="skipped", results=res)
+                    skipped += 1
+                    progress.update(task, advance=1, status=f"[yellow]– {res['skipped']}")
+                else:
+                    storage.finish_benchmark(bench_id, status="ok", results=res)
+                    ok += 1
+                    progress.update(task, advance=1, status="[green]✓")
+                in_flight = None
                 if bench.component == "gpu":
                     _gpu_cleanup()
-                continue
-            res = result.results
-            if isinstance(res, dict) and res.get("skipped"):
-                storage.finish_benchmark(bench_id, status="skipped", results=res)
-                skipped += 1
-                progress.update(task, advance=1, status=f"[yellow]– {res['skipped']}")
-            else:
-                storage.finish_benchmark(bench_id, status="ok", results=res)
-                ok += 1
-                progress.update(task, advance=1, status="[green]✓")
-            if bench.component == "gpu":
-                _gpu_cleanup()
-    return RunSummary(run_id=run_id, benchmarks_ok=ok, benchmarks_failed=failed, benchmarks_skipped=skipped)
+        except KeyboardInterrupt:
+            if in_flight is not None:
+                cid, bench = in_flight
+                storage.finish_benchmark(cid, status="interrupted")
+                interrupted += 1
+                progress.update(task, advance=1, status="[yellow]⨯ interrupted")
+            console.print("\n[yellow]⚠ Interrupt — stopping run…[/]")
+    return RunSummary(
+        run_id=run_id, benchmarks_ok=ok, benchmarks_failed=failed,
+        benchmarks_skipped=skipped, benchmarks_interrupted=interrupted,
+    )
 
 
 def _execute_concurrent(
@@ -291,10 +309,13 @@ def run_benchmarks(cfg: RunConfig, console: Console | None = None) -> RunSummary
         cleanup_fio_files(cfg.ssd_target_dir)
         storage.end_run(run_id)
         storage.close()
-    console.print(f"\nRun [bold cyan]{run_id}[/] finished — "
+    verb = "interrupted" if summary.benchmarks_interrupted else "finished"
+    tail = (f", [yellow]{summary.benchmarks_interrupted} interrupted[/]"
+            if summary.benchmarks_interrupted else "")
+    console.print(f"\nRun [bold cyan]{run_id}[/] {verb} — "
                   f"[green]{summary.benchmarks_ok} ok[/], "
                   f"[yellow]{summary.benchmarks_skipped} skipped[/], "
-                  f"[red]{summary.benchmarks_failed} failed[/]")
+                  f"[red]{summary.benchmarks_failed} failed[/]" + tail)
     return summary
 
 
