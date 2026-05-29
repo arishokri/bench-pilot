@@ -77,6 +77,14 @@ def cmd_run(
     sample_interval: float = typer.Option(
         1.0, "--sample-interval", help="Sensor sampling interval seconds."
     ),
+    warmup: bool = typer.Option(
+        True, "--warmup/--no-warmup",
+        help="Warm up the system with a stress load before benchmarking (60s quick / 2m full).",
+    ),
+    warmup_duration: Optional[str] = typer.Option(
+        None, "--warmup-duration",
+        help="Override warmup duration, e.g. 90s or 2m. Default: 60s quick / 2m full.",
+    ),
 ) -> None:
     """Run benchmarks against selected components, sampling sensors throughout."""
     cfg = RunConfig(
@@ -89,11 +97,14 @@ def cmd_run(
             s.strip() for s in (ollama_models or "").split(",") if s.strip()
         ),
         sample_interval=sample_interval,
+        warmup=warmup,
     )
     if ssd_dir is not None:
         cfg.ssd_target_dir = ssd_dir
     if hf_cache_dir is not None:
         cfg.hf_cache_dir = hf_cache_dir
+    if warmup_duration is not None:
+        cfg.warmup_seconds = _parse_duration(warmup_duration)
     run_benchmarks(cfg, console=console)
 
 

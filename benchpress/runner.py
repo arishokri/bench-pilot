@@ -6,8 +6,8 @@ import signal
 import socket
 import subprocess
 import threading
-import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -180,6 +180,38 @@ def _execute(plan: Iterable[Benchmark], *, storage: Storage, run_id: int, consol
     )
 
 
+@contextmanager
+def _sigint_cancellation(console: Console):
+    """Yield a threading.Event that a first Ctrl+C sets; a second Ctrl+C force-quits.
+
+    We install an explicit SIGINT handler rather than relying on KeyboardInterrupt
+    surfacing inside as_completed() — the main thread is blocked in a lock wait
+    there, so a handler that just sets the event is far more reliable (PEP 475).
+    Restores the previous handler on exit.
+    """
+    cancel = threading.Event()
+    interrupts = {"n": 0}
+
+    def _on_sigint(signum, frame):
+        interrupts["n"] += 1
+        if interrupts["n"] >= 2:
+            os._exit(130)
+        cancel.set()
+        console.print(
+            "\n[yellow]⚠ Interrupt — stopping (press Ctrl+C again to force quit)…[/]"
+        )
+
+    try:
+        prev_handler = signal.signal(signal.SIGINT, _on_sigint)
+    except ValueError:
+        prev_handler = None  # not on the main thread; fall back to default behaviour
+    try:
+        yield cancel
+    finally:
+        if prev_handler is not None:
+            signal.signal(signal.SIGINT, prev_handler)
+
+
 def _execute_concurrent(
     plan: Iterable[Benchmark], *, storage: Storage, run_id: int, console: Console,
 ) -> RunSummary:
@@ -196,11 +228,8 @@ def _execute_concurrent(
     # Tallies are touched from worker threads; guard with a lock.
     counts = {"ok": 0, "failed": 0, "skipped": 0, "interrupted": 0}
     counts_lock = threading.Lock()
-    # Cooperative cancellation: set on Ctrl+C so workers (subprocesses + the GPU
-    # Python loop) wind down promptly instead of running out the full duration.
-    cancel = threading.Event()
 
-    def run_one(bench: Benchmark) -> tuple[str, str, str | None]:
+    def run_one(bench: Benchmark, cancel: threading.Event) -> tuple[str, str, str | None]:
         bench_id = storage.start_benchmark(
             run_id, name=bench.name, component=bench.component, params=bench.params(),
         )
@@ -238,23 +267,9 @@ def _execute_concurrent(
         else:
             progress.update(bench_tasks[name], status=f"[red]✗ {info}", completed=1, total=1)
 
-    # First Ctrl+C requests cooperative cancellation; a second one force-quits.
-    # We install an explicit SIGINT handler rather than relying on KeyboardInterrupt
-    # surfacing inside as_completed() — the main thread is blocked in a lock wait
-    # there, so a handler that just sets the event is far more reliable (PEP 475).
-    interrupts = {"n": 0}
-
-    def _on_sigint(signum, frame):
-        interrupts["n"] += 1
-        if interrupts["n"] >= 2:
-            os._exit(130)
-        cancel.set()
-        console.print(
-            "\n[yellow]⚠ Interrupt — stopping stress run "
-            "(press Ctrl+C again to force quit)…[/]"
-        )
-
-    with Progress(
+    # First Ctrl+C requests cooperative cancellation (workers — subprocesses and the
+    # GPU Python loop — wind down promptly); a second one force-quits.
+    with _sigint_cancellation(console) as cancel, Progress(
         SpinnerColumn(),
         TextColumn("[bold blue]{task.description}"),
         BarColumn(),
@@ -264,13 +279,9 @@ def _execute_concurrent(
         transient=False,
     ) as progress:
         bench_tasks = {b.name: progress.add_task(b.name, total=None, status="…") for b in items}
-        try:
-            prev_handler = signal.signal(signal.SIGINT, _on_sigint)
-        except ValueError:
-            prev_handler = None  # not on the main thread; fall back to default behaviour
         ex = ThreadPoolExecutor(max_workers=len(items))
         try:
-            futures = {ex.submit(run_one, b): b for b in items}
+            futures = {ex.submit(run_one, b, cancel): b for b in items}
             for fut in as_completed(futures):
                 apply(fut)
         except KeyboardInterrupt:
@@ -279,8 +290,6 @@ def _execute_concurrent(
             for fut in as_completed(futures):
                 apply(fut)
         finally:
-            if prev_handler is not None:
-                signal.signal(signal.SIGINT, prev_handler)
             ex.shutdown(wait=False, cancel_futures=True)
     return RunSummary(
         run_id=run_id,
@@ -289,6 +298,56 @@ def _execute_concurrent(
         benchmarks_skipped=counts["skipped"],
         benchmarks_interrupted=counts["interrupted"],
     )
+
+
+def _run_warmup(cfg: RunConfig, *, console: Console) -> bool:
+    """Heat the system with a stress load over `cfg.components` before benchmarking.
+
+    Reuses the stress workloads but records *nothing* — the run's Sampler captures the
+    warmup ramp into the time-series, while the Benchmarks results table stays clean.
+    Returns True if the user interrupted (caller should skip the benchmark phase).
+    """
+    duration = cfg.warmup_budget
+    scfg = StressConfig(
+        components=cfg.components,
+        duration_seconds=duration,
+        ssd_target_dir=cfg.ssd_target_dir,
+    )
+    plan = build_stress_plan(scfg)
+    if not plan:
+        return False
+    console.print(
+        f"[bold]Warming up[/] for {duration}s ({_components_suffix(cfg.components)}) …"
+    )
+    with _sigint_cancellation(console) as cancel, Progress(
+        SpinnerColumn(),
+        TextColumn("[bold blue]{task.description}"),
+        BarColumn(),
+        TextColumn("{task.fields[status]}"),
+        TimeElapsedColumn(),
+        console=console,
+        transient=False,
+    ) as progress:
+        tasks = {b.name: progress.add_task(f"warmup:{b.name}", total=None, status="…") for b in plan}
+        ex = ThreadPoolExecutor(max_workers=len(plan))
+        try:
+            futures = {ex.submit(b.run, cancel): b for b in plan}
+            for fut in as_completed(futures):
+                bench = futures[fut]
+                try:
+                    fut.result()
+                except Exception as e:  # noqa: BLE001
+                    progress.update(tasks[bench.name], status=f"[red]✗ {e}", completed=1, total=1)
+                    continue
+                status = "[yellow]⨯ interrupted" if cancel.is_set() else "[green]✓"
+                progress.update(tasks[bench.name], status=status, completed=1, total=1)
+        except KeyboardInterrupt:
+            cancel.set()
+            for fut in as_completed(futures):
+                pass
+        finally:
+            ex.shutdown(wait=False, cancel_futures=True)
+    return cancel.is_set()
 
 
 def run_benchmarks(cfg: RunConfig, console: Console | None = None) -> RunSummary:
@@ -302,8 +361,13 @@ def run_benchmarks(cfg: RunConfig, console: Console | None = None) -> RunSummary
     sampler.start()
     try:
         _render_sysinfo(console, sysinfo)
-        plan = build_benchmark_plan(cfg)
-        summary = _execute(plan, storage=storage, run_id=run_id, console=console)
+        if cfg.warmup and _run_warmup(cfg, console=console):
+            console.print("[yellow]Warmup interrupted — skipping benchmarks.[/]")
+            summary = RunSummary(run_id=run_id, benchmarks_ok=0, benchmarks_failed=0,
+                                 benchmarks_skipped=0, benchmarks_interrupted=1)
+        else:
+            plan = build_benchmark_plan(cfg)
+            summary = _execute(plan, storage=storage, run_id=run_id, console=console)
     finally:
         sampler.stop()
         cleanup_fio_files(cfg.ssd_target_dir)

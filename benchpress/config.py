@@ -31,6 +31,10 @@ class RunConfig:
     include_image_gen: bool = True
     # Ollama models to probe (must already be `ollama pull`-ed).
     ollama_models: tuple[str, ...] = ()
+    # Warm the system with a stress load before benchmarking (steadies clocks/thermals).
+    warmup: bool = True
+    # Warmup duration. None = derive from `quick` (60s quick / 120s full).
+    warmup_seconds: float | None = None
 
     @property
     def db_path(self) -> Path:
@@ -41,6 +45,12 @@ class RunConfig:
         if self.gpu_seconds_per_test is not None:
             return self.gpu_seconds_per_test
         return 8.0 if self.quick else 20.0
+
+    @property
+    def warmup_budget(self) -> int:
+        if self.warmup_seconds is not None:
+            return int(self.warmup_seconds)
+        return 60 if self.quick else 120
 
 
 @dataclass

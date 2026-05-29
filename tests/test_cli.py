@@ -100,6 +100,27 @@ def test_run_forwards_flags_to_runner(monkeypatch, tmp_path):
     assert cfg.label == "x"
     assert cfg.include_image_gen is False
     assert cfg.data_dir == tmp_path
+    assert cfg.warmup is True            # on by default
+    assert cfg.warmup_seconds is None    # derive from quick/full
+
+
+def test_run_warmup_flags(monkeypatch, tmp_path):
+    """--no-warmup and --warmup-duration reach the RunConfig."""
+    captured = {}
+
+    def fake_run_benchmarks(cfg, console=None):
+        captured["cfg"] = cfg
+        from benchpress.runner import RunSummary
+        return RunSummary(run_id=1, benchmarks_ok=0, benchmarks_failed=0, benchmarks_skipped=0)
+
+    monkeypatch.setattr(cli_mod, "run_benchmarks", fake_run_benchmarks)
+    r = runner.invoke(app, [
+        "run", "--no-warmup", "--warmup-duration", "90s",
+        "--data-dir", str(tmp_path),
+    ])
+    assert r.exit_code == 0, r.output
+    assert captured["cfg"].warmup is False
+    assert captured["cfg"].warmup_seconds == 90
 
 
 def test_stress_forwards_flags_to_runner(monkeypatch, tmp_path):
